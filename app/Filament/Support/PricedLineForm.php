@@ -6,12 +6,14 @@ use App\Enums\LineType;
 use App\Models\BrandingMethod;
 use App\Models\BrandingPosition;
 use App\Models\InclusiveBranding;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Quote;
 use App\Models\SalesOrder;
 use App\Services\Pricing\BrandingPriceLookup;
 use App\Services\Pricing\LinePricer;
 use App\Services\Pricing\Vat;
+use App\Suppliers\Fields;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -59,6 +61,7 @@ class PricedLineForm
                 TextInput::make('item_code')->label('Code'),
                 TextInput::make('description')->required()->columnSpan(3),
                 Text::make(fn (Get $get) => static::stockNote($get('product_variant_id')))->columnSpan(4),
+                Text::make(fn (Get $get) => static::guideLink($get('product_id')))->columnSpan(4),
             ]),
 
             Section::make('Branding')
@@ -112,6 +115,7 @@ class PricedLineForm
                             TextInput::make('unit_cost_override')->label('Unit cost override')->numeric()->prefix('R')
                                 ->helperText('Only if not priced by the supplier')->live(onBlur: true),
                             TextInput::make('setup_override')->label('Setup override')->numeric()->prefix('R')->live(onBlur: true),
+                            Text::make(fn (Get $get) => static::templateLink($get('../../product_id'), $get('position_code')))->columnSpan(6),
                             Hidden::make('position_name'),
                             Hidden::make('method_name'),
                             Hidden::make('replacement_code'),
@@ -206,6 +210,54 @@ class PricedLineForm
             'quantity', 'gp_percent', 'unit_price_override', 'brandings', 'branding_unit_cost', 'setup_cost', 'total_cost',
             'unit_price', 'setup_price', 'line_total', 'gp_amount', 'commission_amount',
         ])));
+    }
+
+    // ------------------------------------------------------------------ branding guide links
+
+    /** Link to the supplier's full branding guide PDF for the product. */
+    public static function guideLink(?string $productId): ?HtmlString
+    {
+        $product = $productId ? once(fn () => Product::find($productId, ['id', 'branding_guide_url', 'raw'])) : null;
+        if (! $product) {
+            return null;
+        }
+
+        $links = [];
+        if ($product->branding_guide_url) {
+            $links[] = static::link($product->branding_guide_url, 'Open branding guide (PDF)');
+        }
+        if ($count = count(static::templates($product))) {
+            $links[] = '<span style="opacity:.7">'.$count.' position template'.($count > 1 ? 's' : '').' - linked under each branding position below</span>';
+        }
+
+        return $links ? new HtmlString(implode(' &nbsp;·&nbsp; ', $links)) : new HtmlString('<span style="opacity:.6">No branding guide from the supplier for this item.</span>');
+    }
+
+    /** Link to the artwork template for one branding position. */
+    public static function templateLink(?string $productId, ?string $positionCode): ?HtmlString
+    {
+        if (! $productId || ! $positionCode) {
+            return null;
+        }
+        $product = once(fn () => Product::find($productId, ['id', 'branding_guide_url', 'raw']));
+        $template = $product ? collect(static::templates($product))->first(fn ($t) => strcasecmp((string) ($t['position'] ?? ''), $positionCode) === 0) : null;
+
+        return $template && ! empty($template['url'])
+            ? new HtmlString(static::link($template['url'], 'Artwork template for position '.e($positionCode).(! empty($template['name']) ? ' ('.e($template['name']).')' : '')))
+            : null;
+    }
+
+    /** @return array<int, array{position?: string, name?: string, url?: string}> */
+    private static function templates(Product $product): array
+    {
+        return array_values(array_filter(Fields::list($product->raw, 'brandingTemplates'), 'is_array'));
+    }
+
+    private static function link(string $url, string $label): string
+    {
+        $href = e(str_replace(' ', '%20', $url));
+
+        return '<a href="'.$href.'" target="_blank" rel="noopener" style="color:rgb(var(--primary-600));text-decoration:underline">'.$label.' &#8599;</a>';
     }
 
     // ------------------------------------------------------------------ helpers
