@@ -39,7 +39,9 @@ class SalesReport
             ->where('company_id', $this->companyId)
             ->where('status', '!=', SalesOrderStatus::Cancelled)
             ->whereNull('deleted_at')
-            ->whereBetween('order_date', [$this->from->toDateString(), $this->to->toDateString()])
+            // whereDate: SQLite stores dates as 'Y-m-d 00:00:00', so a plain BETWEEN on date strings misses the last day.
+            ->whereDate('order_date', '>=', $this->from->toDateString())
+            ->whereDate('order_date', '<=', $this->to->toDateString())
             ->when($this->repId, fn ($q) => $q->where('sales_rep_id', $this->repId))
             ->get(['id', 'number', 'customer_id', 'sales_rep_id', 'order_date', 'status', 'subtotal', 'cost_total', 'gp_amount', 'commission_total', 'total', 'quote_id']);
     }
@@ -49,7 +51,8 @@ class SalesReport
         return $this->quotes ??= Quote::withoutGlobalScopes()
             ->where('company_id', $this->companyId)
             ->whereNull('deleted_at')
-            ->whereBetween('quote_date', [$this->from->toDateString(), $this->to->toDateString()])
+            ->whereDate('quote_date', '>=', $this->from->toDateString())
+            ->whereDate('quote_date', '<=', $this->to->toDateString())
             ->when($this->repId, fn ($q) => $q->where('sales_rep_id', $this->repId))
             ->get(['id', 'sales_rep_id', 'status', 'subtotal', 'gp_amount', 'quote_date']);
     }
