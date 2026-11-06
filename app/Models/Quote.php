@@ -31,6 +31,7 @@ class Quote extends Model
             'valid_until' => 'date',
             'required_by' => 'date',
             'show_setup_separately' => 'boolean',
+            'show_images' => 'boolean',
             'sent_at' => 'datetime',
             'next_follow_up_at' => 'datetime',
             'accepted_at' => 'datetime',

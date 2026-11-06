@@ -74,6 +74,7 @@ class QuoteResource extends Resource
                 DatePicker::make('quote_date')->default(today())->required(),
                 DatePicker::make('valid_until')->default(fn () => today()->addDays(Filament::getTenant()?->quote_valid_days ?: 14)),
                 DatePicker::make('required_by')->label('Customer needs it by'),
+                Toggle::make('show_images')->label('Show product images on the PDF')->default(true),
                 Toggle::make('show_setup_separately')->label('Show setup costs as separate amounts')->default(true)
                     ->helperText('Off = setups spread into the unit price. Re-prices all lines.'),
                 Textarea::make('notes')->label('Notes printed on the quote')->rows(3)->columnSpanFull(),

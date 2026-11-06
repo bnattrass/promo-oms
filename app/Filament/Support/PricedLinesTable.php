@@ -13,6 +13,8 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ReplicateAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Icons\Heroicon;
+use App\Services\Orders\ProductImages;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Table;
@@ -35,7 +37,10 @@ class PricedLinesTable
         return $table
             ->reorderable($editable ? 'sort' : null)
             ->defaultSort('sort')
+            ->modifyQueryUsing(fn ($query) => $query->with('variant.product', 'product'))
             ->columns([
+                ImageColumn::make('thumbnail')->label('')->imageSize(40)
+                    ->getStateUsing(fn (Model $record) => app(ProductImages::class)->urlFor($record->variant, $record->product)),
                 TextColumn::make('item_code')->label('Code')->placeholder('-')
                     ->description(fn (Model $record) => $record->isCatalogue() ? null : LineType::tryFrom($record->line_type)?->getLabel()),
                 TextColumn::make('description')->wrap()

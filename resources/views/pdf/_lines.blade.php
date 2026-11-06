@@ -1,7 +1,9 @@
-{{-- $lines, $money, $showSetup (bool), $costMode (bool: purchase order shows cost) --}}
+{{-- $lines, $money, $showSetup (bool), $costMode (bool: purchase order shows cost), $thumbs (line id => data uri) --}}
+@php($withImages = collect($thumbs ?? [])->filter()->isNotEmpty())
 <table class="lines">
     <thead>
     <tr>
+        @if($withImages)<th style="width:70px"></th>@endif
         <th style="width:14%">Code</th>
         <th>Description</th>
         <th class="num" style="width:8%">Qty</th>
@@ -13,6 +15,9 @@
     <tbody>
     @foreach($lines as $line)
         <tr>
+            @if($withImages)
+                <td style="width:70px">@if(!empty($thumbs[$line->id]))<img src="{{ $thumbs[$line->id] }}" style="width:62px; height:62px; object-fit:contain">@endif</td>
+            @endif
             <td>{{ $line->item_code }}</td>
             <td>
                 {{ $line->description }}

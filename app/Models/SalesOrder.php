@@ -29,6 +29,7 @@ class SalesOrder extends Model
             'order_date' => 'date',
             'required_by' => 'date',
             'deposit_required' => 'decimal:2',
+            'show_images' => 'boolean',
             'deposit_received' => 'decimal:2',
             'deposit_received_at' => 'datetime',
         ];

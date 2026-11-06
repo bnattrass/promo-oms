@@ -78,6 +78,7 @@ class SalesOrderResource extends Resource
                 Text::make(fn (?SalesOrder $record) => $record?->quote
                     ? new HtmlString('From quote <a class="underline" href="'.QuoteResource::getUrl('edit', ['record' => $record->quote]).'">'.e($record->quote->number).'</a>')
                     : null),
+                \Filament\Forms\Components\Toggle::make('show_images')->label('Show product images on the PDF'),
                 Textarea::make('delivery_address')->rows(3)->columnSpanFull(),
                 Textarea::make('notes')->label('Notes printed on documents')->rows(2)->columnSpanFull(),
                 Textarea::make('internal_notes')->rows(2)->columnSpanFull(),

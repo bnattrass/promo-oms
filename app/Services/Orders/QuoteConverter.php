@@ -42,6 +42,7 @@ class QuoteConverter
                 'required_by' => $quote->required_by,
                 'delivery_address' => $customer->delivery_address,
                 'notes' => $quote->notes,
+                'show_images' => $quote->show_images ?? true,
             ]);
 
             foreach ($quote->lines as $line) {
