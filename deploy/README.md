@@ -1,4 +1,6 @@
-# Server setup (for whoever builds the VPS)
+# Server setup (blank Ubuntu VPS)
+
+> **Using CloudPanel?** Use [CLOUDPANEL.md](CLOUDPANEL.md) instead. This guide and setup-server.sh are for a blank server only.
 
 Everything needed to run Promo OMS on a fresh **Ubuntu 24.04 LTS** server.
 

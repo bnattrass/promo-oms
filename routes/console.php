@@ -24,3 +24,12 @@ Schedule::command('suppliers:sync --module=stock')
 
 // Quote follow-ups and deposit reminders.
 Schedule::job(new SendQuoteFollowUps)->hourlyAt(5)->timezone($tz)->between('08:00', '17:00')->weekdays();
+
+/*
+| Hosts without a process manager (e.g. CloudPanel site users can't run Supervisor): set
+| QUEUE_VIA_SCHEDULER=true and the cron-driven scheduler works the queue every minute.
+*/
+if (env('QUEUE_VIA_SCHEDULER', false)) {
+    Schedule::command('queue:work --queue=sync,default --stop-when-empty --max-time=55 --tries=1 --timeout=3600')
+        ->everyMinute()->withoutOverlapping(90)->runInBackground();
+}
