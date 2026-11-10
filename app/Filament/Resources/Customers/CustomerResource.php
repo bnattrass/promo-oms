@@ -40,7 +40,7 @@ class CustomerResource extends Resource
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['name', 'account_code', 'email'];
+        return ['name', 'account_code', 'contacts.name', 'contacts.email'];
     }
 
     public static function salesRepOptions(): array
@@ -55,8 +55,7 @@ class CustomerResource extends Resource
                 TextInput::make('name')->required()->columnSpanFull(),
                 TextInput::make('account_code'),
                 TextInput::make('vat_number')->label('VAT number'),
-                TextInput::make('email')->email(),
-                TextInput::make('phone')->tel(),
+                TextInput::make('phone')->label('Main phone')->tel(),
                 Select::make('sales_rep_id')->label('Sales rep')->options(fn () => static::salesRepOptions())->searchable(),
             ]),
             Section::make('Contact people')
@@ -67,15 +66,14 @@ class CustomerResource extends Resource
                         ->hiddenLabel()
                         ->addActionLabel('Add contact person')
                         ->defaultItems(1)
-                        ->columns(5)
-                        ->itemLabel(fn (array $state) => trim(($state['name'] ?? '').(! empty($state['position']) ? ' - '.$state['position'] : '')).(! empty($state['is_primary']) ? '  (main contact)' : '') ?: null)
+                        ->columns(2)
                         ->collapsible()
                         ->schema([
-                            TextInput::make('name')->required()->columnSpan(1),
+                            TextInput::make('name')->required(),
                             TextInput::make('position')->placeholder('e.g. Marketing manager'),
                             TextInput::make('email')->email(),
                             TextInput::make('phone')->tel(),
-                            Toggle::make('is_primary')->label('Main contact')->inline(false),
+                            Toggle::make('is_primary')->label('Main contact (selected on new quotes)')->columnSpanFull(),
                         ]),
                 ]),
             Section::make('Terms and pricing')->columns(3)->schema([
@@ -104,7 +102,6 @@ class CustomerResource extends Resource
                 TextColumn::make('account_code')->searchable()->toggleable(),
                 TextColumn::make('main_contact')->label('Main contact')
                     ->getStateUsing(fn (Customer $record) => $record->primaryContact()?->name)->placeholder('-'),
-                TextColumn::make('email')->searchable()->toggleable(),
                 TextColumn::make('phone')->toggleable(),
                 TextColumn::make('salesRep.name')->label('Rep'),
                 TextColumn::make('payment_terms')->badge()->color('gray'),
