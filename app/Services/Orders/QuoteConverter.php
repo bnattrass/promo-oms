@@ -16,7 +16,10 @@ class QuoteConverter
 {
     public function __construct(private readonly DocumentTotals $totals) {}
 
-    public function convert(Quote $quote, ?string $customerPoNumber = null): SalesOrder
+    /**
+     * @param  string|null  $poFilePath  a file already stored on the local disk (e.g. from a Filament upload)
+     */
+    public function convert(Quote $quote, ?string $customerPoNumber = null, ?string $poFilePath = null, ?string $poFileName = null): SalesOrder
     {
         if ($quote->salesOrder()->exists()) {
             throw new RuntimeException("Quote {$quote->number} has already been converted.");
@@ -25,7 +28,7 @@ class QuoteConverter
             throw new RuntimeException('A quote needs at least one line before it can become an order.');
         }
 
-        return DB::transaction(function () use ($quote, $customerPoNumber) {
+        return DB::transaction(function () use ($quote, $customerPoNumber, $poFilePath, $poFileName) {
             $quote->loadMissing('lines', 'customer');
             $customer = $quote->customer;
 
@@ -56,6 +59,17 @@ class QuoteConverter
                 $order->update([
                     'deposit_required' => round((float) $order->total * (float) $customer->deposit_percent / 100, 2),
                     'status' => SalesOrderStatus::AwaitingDeposit,
+                ]);
+            }
+
+            if ($poFilePath) {
+                $order->attachments()->create([
+                    'company_id' => $order->company_id,
+                    'type' => 'customer_po',
+                    'disk' => 'local',
+                    'path' => $poFilePath,
+                    'original_name' => $poFileName ?: basename($poFilePath),
+                    'notes' => $customerPoNumber ? "PO {$customerPoNumber}" : null,
                 ]);
             }
 

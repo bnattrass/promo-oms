@@ -13,6 +13,7 @@ use App\Services\Pricing\DocumentTotals;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -52,12 +53,28 @@ class EditQuote extends EditRecord
                 ->icon(Heroicon::OutlinedArrowRightCircle)
                 ->color('success')
                 ->visible(fn () => in_array($this->record->status, [QuoteStatus::Draft, QuoteStatus::Sent, QuoteStatus::Accepted], true))
-                ->schema([TextInput::make('customer_po_number')->label("Customer's order number")])
+                ->schema([
+                    TextInput::make('customer_po_number')->label("Customer's order number"),
+                    FileUpload::make('customer_po_file')
+                        ->label("Customer's purchase order (optional)")
+                        ->helperText('PDF, image or Word document, up to 20 MB. You can also upload it later on the sales order.')
+                        ->disk('local')
+                        ->directory('attachments/customer-po')
+                        ->visibility('private')
+                        ->acceptedFileTypes(['application/pdf', 'image/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-outlook', 'message/rfc822'])
+                        ->maxSize(20480)
+                        ->storeFileNamesIn('customer_po_file_name'),
+                ])
                 ->requiresConfirmation()
                 ->modalDescription('Copies all lines to a new sales order. The quote is then locked.')
                 ->action(function (array $data) {
                     try {
-                        $order = app(QuoteConverter::class)->convert($this->record, $data['customer_po_number'] ?? null);
+                        $order = app(QuoteConverter::class)->convert(
+                            $this->record,
+                            $data['customer_po_number'] ?? null,
+                            $data['customer_po_file'] ?? null,
+                            $data['customer_po_file_name'] ?? null,
+                        );
                     } catch (Throwable $e) {
                         Notification::make()->danger()->title('Could not convert')->body($e->getMessage())->send();
 

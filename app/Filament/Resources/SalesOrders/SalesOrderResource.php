@@ -9,6 +9,7 @@ use App\Filament\Resources\SalesOrders\Pages\EditSalesOrder;
 use App\Filament\Resources\SalesOrders\Pages\ListSalesOrders;
 use App\Filament\Resources\SalesOrders\RelationManagers\LinesRelationManager;
 use App\Filament\Resources\SalesOrders\RelationManagers\PurchaseOrdersRelationManager;
+use App\Filament\RelationManagers\AttachmentsRelationManager;
 use App\Models\Contact;
 use App\Models\SalesOrder;
 use BackedEnum;
@@ -82,7 +83,10 @@ class SalesOrderResource extends Resource
                     ->disabled(fn (Get $get) => blank($get('customer_id')))
                     ->helperText('Printed on the order and used as the email recipient'),
                 Select::make('sales_rep_id')->label('Sales rep')->options(fn () => CustomerResource::salesRepOptions()),
-                TextInput::make('customer_po_number')->label("Customer's order no."),
+                TextInput::make('customer_po_number')->label("Customer's order no.")
+                    ->helperText(fn (?SalesOrder $record) => $record?->customerPurchaseOrder()
+                        ? 'PO document on file: '.$record->customerPurchaseOrder()->original_name.' (see Documents below)'
+                        : 'No PO document yet - upload it under Documents below'),
                 TextInput::make('reference'),
                 DatePicker::make('order_date')->required(),
                 DatePicker::make('required_by'),
@@ -131,7 +135,7 @@ class SalesOrderResource extends Resource
 
     public static function getRelations(): array
     {
-        return [LinesRelationManager::class, PurchaseOrdersRelationManager::class];
+        return [LinesRelationManager::class, PurchaseOrdersRelationManager::class, AttachmentsRelationManager::class];
     }
 
     public static function getPages(): array

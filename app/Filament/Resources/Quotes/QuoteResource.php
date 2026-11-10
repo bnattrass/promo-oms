@@ -8,6 +8,7 @@ use App\Filament\Resources\Quotes\Pages\CreateQuote;
 use App\Filament\Resources\Quotes\Pages\EditQuote;
 use App\Filament\Resources\Quotes\Pages\ListQuotes;
 use App\Filament\Resources\Quotes\RelationManagers\LinesRelationManager;
+use App\Filament\RelationManagers\AttachmentsRelationManager;
 use App\Models\Contact;
 use App\Models\Customer;
 use App\Models\Quote;
@@ -148,7 +149,7 @@ class QuoteResource extends Resource
 
     public static function getRelations(): array
     {
-        return [LinesRelationManager::class];
+        return [LinesRelationManager::class, AttachmentsRelationManager::class];
     }
 
     public static function getPages(): array

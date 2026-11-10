@@ -63,6 +63,16 @@ class Quote extends Model
         return $this->hasOne(SalesOrder::class);
     }
 
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable')->latest();
+    }
+
+    public function customerPurchaseOrder(): ?Attachment
+    {
+        return $this->attachments()->where('type', 'customer_po')->first();
+    }
+
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'subject')->latest();
