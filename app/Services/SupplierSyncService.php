@@ -38,7 +38,7 @@ class SupplierSyncService
 
         try {
             $connector->sync($module, $mode, $run);
-            $run->finish('success');
+            $run->finish('success', $run->fresh()->message);
             $this->flagFullSync($supplier, $module, false);
         } catch (SupplierUnavailableException $e) {
             $run->finish('skipped', $e->getMessage());

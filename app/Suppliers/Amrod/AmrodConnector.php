@@ -124,7 +124,7 @@ class AmrodConnector implements SupplierConnector
             'brands' => $this->importBrands($rows),
             'branding_prices' => $this->importBrandingPrices($rows, $mode),
             'inclusive_brandings' => $this->importInclusiveBrandings($rows, $mode),
-            'prices' => $this->importPrices($rows),
+            'prices' => $this->importPrices($rows, $run),
             'stock' => $this->importStock($rows),
             default => throw new InvalidArgumentException("Amrod connector cannot sync [{$module}]"),
         };
@@ -388,19 +388,28 @@ class AmrodConnector implements SupplierConnector
     // ---------------------------------------------------------------- prices & stock
 
     /** Prices match on the variant full code only. Ex VAT, at the account's tier. */
-    private function importPrices(array $rows): array
+    private function importPrices(array $rows, ?SyncRun $run = null): array
     {
         $counts = ['created' => 0, 'updated' => 0, 'deleted' => 0];
+        $noPriceField = 0;
+        $noMatch = 0;
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            DB::transaction(function () use ($chunk, &$counts) {
+            DB::transaction(function () use ($chunk, &$counts, &$noPriceField, &$noMatch) {
                 foreach ($chunk as $row) {
-                    $fullCode = F::string($row, 'fullCode', 'itemCode', 'productCode', 'code');
+                    $fullCode = F::string($row, 'fullCode', 'itemCode', 'productCode', 'code', 'sku');
                     if (! $fullCode) {
                         continue;
                     }
                     $removed = F::int($row, 'actionType') === self::ACTION_REMOVED;
-                    $price = F::float($row, 'price', 'sellingPrice', 'unitPrice', 'netPrice');
+                    $price = F::float($row, 'price', 'sellingPrice', 'unitPrice', 'netPrice', 'customerPrice', 'tierPrice', 'priceExVat', 'amount');
+
+                    // Never blank an existing price because a field name didn't match.
+                    if (! $removed && $price === null) {
+                        $noPriceField++;
+
+                        continue;
+                    }
 
                     $updated = ProductVariant::where('supplier_id', $this->supplier->id)
                         ->where('full_code', $fullCode)
@@ -408,9 +417,24 @@ class AmrodConnector implements SupplierConnector
                             'cost_price' => $removed ? null : $price,
                             'price_synced_at' => now(),
                         ]);
-                    $removed ? $counts['deleted'] += $updated : $counts['updated'] += $updated;
+                    if ($updated === 0) {
+                        $noMatch++;
+                    }
+                    if ($removed) {
+                        $counts['deleted'] += $updated;
+                    } else {
+                        $counts['updated'] += $updated;
+                    }
                 }
             });
+        }
+
+        $warnings = array_filter([
+            $noPriceField ? "{$noPriceField} rows had no recognisable price field - run: php artisan suppliers:inspect AMROD prices" : null,
+            $noMatch ? "{$noMatch} price rows matched no product variant (import products first)" : null,
+        ]);
+        if ($warnings && $run) {
+            $run->update(['message' => implode('; ', $warnings)]);
         }
 
         return $counts;
