@@ -54,6 +54,8 @@ php8.4 $(which composer) install --no-dev --optimize-autoloader --no-interaction
 php8.4 artisan key:generate --force
 php8.4 artisan migrate --force --seed
 php8.4 artisan storage:link
+php8.4 artisan livewire:publish --assets   # CloudPanel serves .js from disk: publish Livewire's script
+php8.4 artisan filament:assets
 php8.4 artisan optimize
 php8.4 artisan filament:optimize || true
 chmod -R ug+rwX storage bootstrap/cache
@@ -87,6 +89,13 @@ cd ~/htdocs/<domain> && bash deploy/deploy-cloudpanel.sh
 ## Backups
 CloudPanel → **Backups** (enable remote backups) covers files and databases. Make sure `.env` is included: its APP_KEY
 decrypts the stored supplier passwords.
+
+## Troubleshooting
+- **Sign in button does nothing / page never reacts:** Livewire's JavaScript isn't loading
+  (`curl -s -o /dev/null -w "%{http_code}" https://<domain>/livewire/livewire.min.js` returns 404).
+  Run `php8.4 artisan livewire:publish --assets && php8.4 artisan filament:assets && php8.4 artisan optimize`.
+- **Access denied for user** on `db:show`: DB_USERNAME must be the *database* user from CloudPanel → Databases,
+  not the site/SSH user.
 
 ## Checks
 | What | Command |
