@@ -13,7 +13,11 @@
     <div class="box" style="width:50%">
         <strong>Quote for</strong><br>
         {{ $doc->customer?->name }}<br>
-        @if($doc->contact) Attn: {{ $doc->contact->name }}<br>@endif
+        @if($doc->contact)
+            Attn: {{ $doc->contact->name }}@if($doc->contact->position), {{ $doc->contact->position }}@endif<br>
+            @if($doc->contact->email){{ $doc->contact->email }}<br>@endif
+            @if($doc->contact->phone){{ $doc->contact->phone }}<br>@endif
+        @endif
         {!! nl2br(e($doc->customer?->billing_address)) !!}
     </div>
 @endsection

@@ -6,14 +6,15 @@ use App\Enums\PaymentTerms;
 use App\Filament\Resources\Customers\Pages\CreateCustomer;
 use App\Filament\Resources\Customers\Pages\EditCustomer;
 use App\Filament\Resources\Customers\Pages\ListCustomers;
-use App\Filament\Resources\Customers\RelationManagers\ContactsRelationManager;
 use App\Models\Customer;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -58,6 +59,25 @@ class CustomerResource extends Resource
                 TextInput::make('phone')->tel(),
                 Select::make('sales_rep_id')->label('Sales rep')->options(fn () => static::salesRepOptions())->searchable(),
             ]),
+            Section::make('Contact people')
+                ->description('Add everyone you deal with at this company. The main contact is selected on new quotes automatically.')
+                ->schema([
+                    Repeater::make('contacts')
+                        ->relationship()
+                        ->hiddenLabel()
+                        ->addActionLabel('Add contact person')
+                        ->defaultItems(1)
+                        ->columns(5)
+                        ->itemLabel(fn (array $state) => trim(($state['name'] ?? '').(! empty($state['position']) ? ' - '.$state['position'] : '')).(! empty($state['is_primary']) ? '  (main contact)' : '') ?: null)
+                        ->collapsible()
+                        ->schema([
+                            TextInput::make('name')->required()->columnSpan(1),
+                            TextInput::make('position')->placeholder('e.g. Marketing manager'),
+                            TextInput::make('email')->email(),
+                            TextInput::make('phone')->tel(),
+                            Toggle::make('is_primary')->label('Main contact')->inline(false),
+                        ]),
+                ]),
             Section::make('Terms and pricing')->columns(3)->schema([
                 Select::make('payment_terms')->options(PaymentTerms::class)->default(PaymentTerms::Deposit)->required()->live(),
                 TextInput::make('deposit_percent')->label('Deposit %')->numeric()->suffix('%')->default(50)
@@ -78,9 +98,12 @@ class CustomerResource extends Resource
     {
         return $table
             ->defaultSort('name')
+            ->modifyQueryUsing(fn ($query) => $query->with('contacts', 'salesRep'))
             ->columns([
                 TextColumn::make('name')->searchable()->sortable()->weight('medium'),
                 TextColumn::make('account_code')->searchable()->toggleable(),
+                TextColumn::make('main_contact')->label('Main contact')
+                    ->getStateUsing(fn (Customer $record) => $record->primaryContact()?->name)->placeholder('-'),
                 TextColumn::make('email')->searchable()->toggleable(),
                 TextColumn::make('phone')->toggleable(),
                 TextColumn::make('salesRep.name')->label('Rep'),
@@ -97,7 +120,7 @@ class CustomerResource extends Resource
 
     public static function getRelations(): array
     {
-        return [ContactsRelationManager::class];
+        return [];
     }
 
     public static function getPages(): array

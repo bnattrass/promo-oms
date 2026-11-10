@@ -64,9 +64,19 @@ class QuoteResource extends Resource
                             $set('sales_rep_id', $customer->sales_rep_id);
                         }
                     }),
-                Select::make('contact_id')->label('Contact')
-                    ->options(fn (Get $get) => $get('customer_id') ? Contact::where('customer_id', $get('customer_id'))->pluck('name', 'id') : [])
-                    ->searchable(),
+                Select::make('contact_id')->label('Contact person')
+                    ->options(fn (Get $get) => $get('customer_id') ? Contact::where('customer_id', $get('customer_id'))->orderByDesc('is_primary')->orderBy('name')->get()->mapWithKeys(fn (Contact $c) => [$c->id => $c->label()]) : [])
+                    ->searchable()
+                    ->placeholder(fn (Get $get) => $get('customer_id') ? 'Select or add a contact' : 'Pick the customer first')
+                    ->createOptionForm([
+                        TextInput::make('name')->required(),
+                        TextInput::make('position'),
+                        TextInput::make('email')->email(),
+                        TextInput::make('phone')->tel(),
+                    ])
+                    ->createOptionUsing(fn (array $data, Get $get) => Contact::create($data + ['customer_id' => $get('customer_id'), 'is_primary' => Contact::where('customer_id', $get('customer_id'))->doesntExist()])->getKey())
+                    ->disabled(fn (Get $get) => blank($get('customer_id')))
+                    ->helperText('Printed on the quote and used as the email recipient'),
                 Select::make('sales_rep_id')->label('Sales rep')
                     ->options(fn () => CustomerResource::salesRepOptions())
                     ->default(fn () => auth()->id()),
