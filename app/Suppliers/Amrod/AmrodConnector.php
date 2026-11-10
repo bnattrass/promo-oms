@@ -224,7 +224,7 @@ class AmrodConnector implements SupplierConnector
     // ---------------------------------------------------------------- branding lookups
 
     /**
-     * Payload (documented): [{brandingCode, brandingMethod, data: [{printCode, minQuantity, maxQuantity(-1 = no max),
+     * Payload (documented): [{brandingCode, brandingMethod, data: [{printCode, minQuantity (-1 = no min), maxQuantity(-1 = no max),
      * numberOfColours(-2 = not colour based), setup, price}]}]
      */
     private function importBrandingPrices(array $rows, string $mode): array

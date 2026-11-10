@@ -17,7 +17,8 @@ class BrandingPriceLookup
     public function find(int $supplierId, string $brandingCode, int $quantity, ?int $colours = null): ?BrandingPrice
     {
         $rows = $this->rows($supplierId, $brandingCode)->filter(
-            fn (BrandingPrice $p) => $quantity >= $p->min_quantity
+            // -1 / 0 = no minimum, -1 = no maximum (Amrod conventions)
+            fn (BrandingPrice $p) => ($p->min_quantity <= 0 || $quantity >= $p->min_quantity)
                 && ($p->max_quantity === BrandingPrice::UNLIMITED_QTY || $quantity <= $p->max_quantity)
         );
 
