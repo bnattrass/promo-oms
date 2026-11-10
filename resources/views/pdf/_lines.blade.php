@@ -1,5 +1,6 @@
 {{-- $lines, $money, $showSetup (bool), $costMode (bool: purchase order shows cost), $thumbs (line id => data uri) --}}
 @php($withImages = collect($thumbs ?? [])->filter()->isNotEmpty())
+@php($showSetup = $showSetup && $lines->sum($costMode ? 'setup_cost' : 'setup_price') > 0)
 <table class="lines">
     <thead>
     <tr>

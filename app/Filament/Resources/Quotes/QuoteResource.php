@@ -15,6 +15,7 @@ use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -85,8 +86,15 @@ class QuoteResource extends Resource
                 DatePicker::make('valid_until')->default(fn () => today()->addDays(Filament::getTenant()?->quote_valid_days ?: 14)),
                 DatePicker::make('required_by')->label('Customer needs it by'),
                 Toggle::make('show_images')->label('Show product images on the PDF')->default(true),
-                Toggle::make('show_setup_separately')->label('Show setup costs as separate amounts')->default(true)
-                    ->helperText('Off = setups spread into the unit price. Re-prices all lines.'),
+                Radio::make('show_setup_separately')
+                    ->label('How to show prices on the quote')
+                    ->boolean(
+                        trueLabel: 'Item price + setup charges shown separately',
+                        falseLabel: 'All-in price per item (item, branding and setup combined, then divided by the quantity)',
+                    )
+                    ->default(true)
+                    ->columnSpanFull()
+                    ->helperText('Changing this re-prices every line. GP % stays the same either way.'),
                 Textarea::make('notes')->label('Notes printed on the quote')->rows(3)->columnSpanFull(),
                 Textarea::make('internal_notes')->rows(2)->columnSpanFull(),
             ]),
