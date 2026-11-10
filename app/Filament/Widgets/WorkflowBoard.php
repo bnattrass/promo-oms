@@ -78,7 +78,8 @@ class WorkflowBoard extends Widget
                     'stages' => [
                         $orderStage('Dispatched - to invoice', [SalesOrderStatus::PartiallyDispatched, SalesOrderStatus::Dispatched], 'to_invoice'),
                         $orderStage('Invoiced (last 30 days)', [SalesOrderStatus::Invoiced], 'invoiced',
-                            fn (Builder $q) => $q->where('updated_at', '>=', now()->subDays(30))),
+                            fn (Builder $q) => $q->where(fn ($w) => $w->whereDate('invoice_date', '>=', now()->subDays(30)->toDateString())
+                                ->orWhere(fn ($n) => $n->whereNull('invoice_date')->where('updated_at', '>=', now()->subDays(30))))),
                     ],
                 ],
             ],

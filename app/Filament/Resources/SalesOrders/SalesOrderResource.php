@@ -102,6 +102,10 @@ class SalesOrderResource extends Resource
                 Select::make('status')->options(SalesOrderStatus::class)->required()
                     ->helperText('Moves automatically as deposits, POs and dispatch are recorded'),
                 ...QuoteResource::totalFields(),
+                TextInput::make('invoice_number')->label('Invoice no.')->placeholder('Not invoiced yet')
+                    ->helperText('Use "Mark as invoiced" at the top to record the invoice and upload the PDF'),
+                DatePicker::make('invoice_date'),
+                TextInput::make('invoiced_amount')->label('Invoice total (incl VAT)')->prefix('R')->numeric(),
                 TextInput::make('deposit_required')->prefix('R')->numeric(),
                 TextInput::make('deposit_received')->prefix('R')->disabled()->dehydrated(false),
             ]),
@@ -123,6 +127,7 @@ class SalesOrderResource extends Resource
                 TextColumn::make('required_by')->date('j M Y')->sortable()
                     ->color(fn ($state, SalesOrder $record) => $state && $state->isPast() && $record->status->isOpen() ? 'danger' : null),
                 TextColumn::make('total')->money('ZAR')->sortable(),
+                TextColumn::make('invoice_number')->label('Invoice')->searchable()->placeholder('-')->toggleable(),
                 TextColumn::make('gp_percent')->label('GP %')->suffix('%')->toggleable(),
                 TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
             ])

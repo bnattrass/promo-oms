@@ -32,6 +32,8 @@ class SalesOrder extends Model
             'show_images' => 'boolean',
             'deposit_received' => 'decimal:2',
             'deposit_received_at' => 'datetime',
+            'invoice_date' => 'date',
+            'invoiced_amount' => 'decimal:2',
         ];
     }
 

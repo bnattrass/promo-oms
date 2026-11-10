@@ -12,6 +12,7 @@ use App\Services\Orders\PurchaseOrderGenerator;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -83,6 +84,53 @@ class EditSalesOrder extends EditRecord
                         ->actions($pos->map(fn ($po) => Action::make('open'.$po->id)->label("Open {$po->number}")
                             ->url(PurchaseOrderResource::getUrl('edit', ['record' => $po])))->all())
                         ->send();
+                }),
+
+            Action::make('invoice')
+                ->label(fn () => $this->record->invoice_number ? 'Invoice details' : 'Mark as invoiced')
+                ->icon(Heroicon::OutlinedDocumentCurrencyDollar)
+                ->color(fn () => $this->record->invoice_number ? 'gray' : 'success')
+                ->visible(fn () => $this->record->status !== SalesOrderStatus::Cancelled)
+                ->fillForm(fn () => [
+                    'invoice_number' => $this->record->invoice_number,
+                    'invoice_date' => $this->record->invoice_date ?? today(),
+                    'invoiced_amount' => $this->record->invoiced_amount ?? $this->record->total,
+                ])
+                ->schema([
+                    TextInput::make('invoice_number')->label('Invoice number')->required(),
+                    DatePicker::make('invoice_date')->required(),
+                    TextInput::make('invoiced_amount')->label('Invoice total (incl VAT)')->prefix('R')->numeric()->required()
+                        ->helperText(fn () => 'Order total is R '.number_format((float) $this->record->total, 2, '.', ' ')),
+                    FileUpload::make('invoice_file')
+                        ->label('Invoice PDF (optional)')
+                        ->disk('local')->directory('attachments/invoices')->visibility('private')
+                        ->acceptedFileTypes(['application/pdf', 'image/*'])
+                        ->maxSize(20480)
+                        ->storeFileNamesIn('invoice_file_name'),
+                ])
+                ->modalDescription('Moves the order to Invoiced. The PDF is saved under Documents.')
+                ->action(function (array $data) {
+                    $this->record->update([
+                        'invoice_number' => $data['invoice_number'],
+                        'invoice_date' => $data['invoice_date'],
+                        'invoiced_amount' => $data['invoiced_amount'],
+                        'status' => in_array($this->record->status, [SalesOrderStatus::Closed], true) ? $this->record->status : SalesOrderStatus::Invoiced,
+                    ]);
+                    if (! empty($data['invoice_file'])) {
+                        $this->record->attachments()->create([
+                            'company_id' => $this->record->company_id,
+                            'type' => 'invoice',
+                            'disk' => 'local',
+                            'path' => $data['invoice_file'],
+                            'original_name' => $data['invoice_file_name'] ?? basename($data['invoice_file']),
+                            'notes' => 'Invoice '.$data['invoice_number'],
+                        ]);
+                    }
+                    Activity::log($this->record, 'status_change', "Invoiced: {$data['invoice_number']} for R ".number_format((float) $data['invoiced_amount'], 2));
+                    $this->refreshTotals();
+                    $this->refreshFormData(['invoice_number', 'invoice_date', 'invoiced_amount']);
+                    $this->dispatch('refresh-lines');
+                    Notification::make()->success()->title('Order marked as invoiced')->send();
                 }),
 
             DocumentActions::email('sales_order_confirmation', 'Email confirmation'),

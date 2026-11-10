@@ -17,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\On;
 
 /** "Documents" tab on quotes and sales orders: customer POs, artwork, proofs, delivery notes. */
 class AttachmentsRelationManager extends RelationManager
@@ -24,6 +25,9 @@ class AttachmentsRelationManager extends RelationManager
     protected static string $relationship = 'attachments';
 
     protected static ?string $title = 'Documents';
+
+    #[On('refresh-lines')]
+    public function refreshDocuments(): void {}
 
     public function isReadOnly(): bool
     {
