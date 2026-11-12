@@ -110,6 +110,28 @@ class SalesOrder extends Model
         };
     }
 
+    /** Statuses that count as a sale (revenue): the order has been invoiced. */
+    public const INVOICED_STATUSES = ['invoiced', 'closed'];
+
+    /** Sales = invoiced orders, dated by invoice date (falls back to order date if none was entered). */
+    public function scopeInvoicedBetween(\Illuminate\Database\Eloquent\Builder $query, string $from, string $to): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereIn('status', self::INVOICED_STATUSES)
+            ->whereRaw('date(coalesce(invoice_date, order_date)) >= ?', [$from])
+            ->whereRaw('date(coalesce(invoice_date, order_date)) <= ?', [$to]);
+    }
+
+    /** Confirmed orders not yet invoiced (the order book). */
+    public function scopeNotYetInvoiced(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereNotIn('status', [...self::INVOICED_STATUSES, SalesOrderStatus::Cancelled->value]);
+    }
+
+    public function salesDate(): ?\Illuminate\Support\Carbon
+    {
+        return $this->invoice_date ?? $this->order_date;
+    }
+
     public function commissionPaidBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'commission_paid_by');

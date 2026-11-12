@@ -35,12 +35,16 @@ class CommissionReport
             ->get(['id', 'name', 'commission_percent', 'monthly_target']);
 
         $period = $this->orders()
-            ->whereDate('order_date', '>=', $from->toDateString())->whereDate('order_date', '<=', $to->toDateString())
+            ->invoicedBetween($from->toDateString(), $to->toDateString())
             ->selectRaw('sales_rep_id, COUNT(*) as orders, SUM(subtotal) as sales, SUM(gp_amount) as gp, SUM(commission_total) as commission')
             ->groupBy('sales_rep_id')->get()->keyBy('sales_rep_id');
 
         $unpaid = $this->orders()->commission(CommissionStatus::Unpaid)
             ->selectRaw('sales_rep_id, COUNT(*) as orders, SUM(commission_total) as amount')
+            ->groupBy('sales_rep_id')->get()->keyBy('sales_rep_id');
+
+        $book = $this->orders()->notYetInvoiced()
+            ->selectRaw('sales_rep_id, COUNT(*) as orders, SUM(subtotal) as value')
             ->groupBy('sales_rep_id')->get()->keyBy('sales_rep_id');
 
         $pending = $this->orders()->commission(CommissionStatus::NotDue)
@@ -54,7 +58,7 @@ class CommissionReport
 
         $months = max(1, (int) ceil($from->diffInMonths($to)));
 
-        return $reps->map(function (User $rep) use ($period, $unpaid, $pending, $paidInPeriod, $months) {
+        return $reps->map(function (User $rep) use ($period, $unpaid, $pending, $paidInPeriod, $months, $book) {
             $p = $period->get($rep->id);
             $sales = (float) ($p->sales ?? 0);
             $gp = (float) ($p->gp ?? 0);
@@ -76,6 +80,8 @@ class CommissionReport
                 'unpaid_orders' => (int) ($unpaid->get($rep->id)->orders ?? 0),
                 'pending' => (float) ($pending->get($rep->id)->amount ?? 0),
                 'paid_in_period' => (float) ($paidInPeriod->get($rep->id)->amount ?? 0),
+                'order_book' => (float) ($book->get($rep->id)->value ?? 0),
+                'order_book_count' => (int) ($book->get($rep->id)->orders ?? 0),
             ];
         })->sortByDesc('sales')->values();
     }

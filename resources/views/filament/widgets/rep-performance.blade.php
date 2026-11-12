@@ -45,18 +45,20 @@
                         <div class="rp-avatar">{{ strtoupper($c['initials']) }}</div>
                         <div>
                             <div class="rp-name">{{ $c['name'] }}</div>
-                            <div class="rp-sub">{{ $c['orders'] }} order(s) · {{ rtrim(rtrim(number_format($c['commission_rate'], 2), '0'), '.') }}% commission on GP</div>
+                            <div class="rp-sub">{{ $c['orders'] }} invoiced · {{ rtrim(rtrim(number_format($c['commission_rate'], 2), '0'), '.') }}% commission on GP</div>
                         </div>
                     </div>
 
                     <div class="rp-sales">{{ $money($c['sales']) }}</div>
                     <div class="rp-sub">
-                        sales excl. VAT
+                        invoiced sales excl. VAT
                         @if ($c['target']) · {{ number_format($tp, 0) }}% of {{ $money($c['target']) }} target @endif
                     </div>
                     @if ($c['target'])
                         <div class="rp-bar"><div style="width: {{ min(100, $tp) }}%; background: {{ $barColour }}"></div></div>
                     @endif
+
+                    <div class="rp-sub" style="margin-top:.35rem">Order book: {{ $money($c['order_book']) }} in {{ $c['order_book_count'] }} order(s) not yet invoiced</div>
 
                     <div class="rp-stats">
                         <div><div class="rp-stat-label">GP</div><div class="rp-stat-value">{{ $money($c['gp']) }}</div></div>

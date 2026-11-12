@@ -26,8 +26,10 @@ class SalesStats extends StatsOverviewWidget
         $monthStart = now()->startOfMonth();
 
         $orders = SalesOrder::where('company_id', $companyId)->where('status', '!=', SalesOrderStatus::Cancelled);
-        $salesThisMonth = (clone $orders)->where('order_date', '>=', $monthStart)->sum('subtotal');
-        $gpThisMonth = (clone $orders)->where('order_date', '>=', $monthStart)->sum('gp_amount');
+        $invoicedThisMonth = (clone $orders)->invoicedBetween($monthStart->toDateString(), now()->toDateString());
+        $salesThisMonth = (clone $invoicedThisMonth)->sum('subtotal');
+        $gpThisMonth = (clone $invoicedThisMonth)->sum('gp_amount');
+        $book = (clone $orders)->notYetInvoiced();
 
         $quotes = Quote::where('company_id', $companyId);
         $openQuotes = (clone $quotes)->whereIn('status', [QuoteStatus::Draft, QuoteStatus::Sent, QuoteStatus::Accepted]);
@@ -35,13 +37,15 @@ class SalesStats extends StatsOverviewWidget
             ->whereIn('status', [QuoteStatus::Converted, QuoteStatus::Declined, QuoteStatus::Expired])->count();
         $won90 = (clone $quotes)->where('quote_date', '>=', now()->subDays(90))->where('status', QuoteStatus::Converted)->count();
 
-        $daily = (clone $orders)->where('order_date', '>=', now()->subDays(30))
-            ->selectRaw('order_date, SUM(subtotal) as total')->groupBy('order_date')->orderBy('order_date')->pluck('total')->map(fn ($v) => (float) $v)->all();
+        $daily = (clone $orders)->invoicedBetween(now()->subDays(30)->toDateString(), now()->toDateString())
+            ->selectRaw('date(coalesce(invoice_date, order_date)) as d, SUM(subtotal) as total')->groupBy('d')->orderBy('d')->pluck('total')->map(fn ($v) => (float) $v)->all();
 
         return [
-            Stat::make('Sales this month (ex VAT)', $money($salesThisMonth))
+            Stat::make('Invoiced this month (ex VAT)', $money($salesThisMonth))
                 ->description('GP '.$money($gpThisMonth).($salesThisMonth > 0 ? ' · '.number_format($gpThisMonth / $salesThisMonth * 100, 1).'%' : ''))
                 ->chart($daily ?: null)->color('success'),
+            Stat::make('Order book (not yet invoiced)', $money((clone $book)->sum('subtotal')))
+                ->description(number_format((clone $book)->count()).' open order(s)')->color('info'),
             Stat::make('Open quotes', number_format((clone $openQuotes)->count()))
                 ->description($money((clone $openQuotes)->sum('subtotal')).' in the pipeline'),
             Stat::make('Quote win rate (90 days)', $decided90 ? number_format($won90 / $decided90 * 100, 0).'%' : '-')

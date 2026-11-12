@@ -13,8 +13,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 
 /**
- * Sales figures for one company and date range. Sales = confirmed sales orders (not cancelled) by order date,
- * ex VAT. Quotes are counted by quote date. Grouping is done in PHP so it works on SQLite and MySQL.
+ * Sales figures for one company and date range. Sales = invoiced sales orders by invoice date, ex VAT. Quotes are counted by quote date. Grouping is done in PHP so it works on SQLite and MySQL.
  */
 class SalesReport
 {
@@ -32,18 +31,28 @@ class SalesReport
         $this->to = CarbonImmutable::parse($to)->endOfDay();
     }
 
+    /** Invoiced orders in the range, by invoice date. Not-yet-invoiced orders are the order book, not sales. */
     public function orders(): Collection
     {
         return $this->orders ??= SalesOrder::withoutGlobalScopes()
             ->with('customer:id,name', 'salesRep:id,name')
             ->where('company_id', $this->companyId)
-            ->where('status', '!=', SalesOrderStatus::Cancelled)
             ->whereNull('deleted_at')
-            // whereDate: SQLite stores dates as 'Y-m-d 00:00:00', so a plain BETWEEN on date strings misses the last day.
-            ->whereDate('order_date', '>=', $this->from->toDateString())
-            ->whereDate('order_date', '<=', $this->to->toDateString())
+            ->invoicedBetween($this->from->toDateString(), $this->to->toDateString())
             ->when($this->repId, fn ($q) => $q->where('sales_rep_id', $this->repId))
-            ->get(['id', 'number', 'customer_id', 'sales_rep_id', 'order_date', 'status', 'subtotal', 'cost_total', 'gp_amount', 'commission_total', 'total', 'quote_id']);
+            ->get(['id', 'number', 'customer_id', 'sales_rep_id', 'order_date', 'invoice_date', 'invoice_number', 'status', 'subtotal', 'cost_total', 'gp_amount', 'commission_total', 'total', 'quote_id']);
+    }
+
+    /** Value of confirmed orders not yet invoiced (current, not limited to the date range). */
+    public function orderBook(): array
+    {
+        $q = SalesOrder::withoutGlobalScopes()
+            ->where('company_id', $this->companyId)
+            ->whereNull('deleted_at')
+            ->notYetInvoiced()
+            ->when($this->repId, fn ($q) => $q->where('sales_rep_id', $this->repId));
+
+        return ['count' => (clone $q)->count(), 'value' => (float) (clone $q)->sum('subtotal'), 'gp' => (float) (clone $q)->sum('gp_amount')];
     }
 
     public function quotes(): Collection
@@ -76,6 +85,7 @@ class SalesReport
             'quotes' => $q->count(),
             'quote_value' => (float) $q->sum('subtotal'),
             'win_rate' => $decided->count() ? $won->count() / $decided->count() * 100 : null,
+            'order_book' => $this->orderBook(),
             'open_pipeline' => (float) $q->whereIn('status', [QuoteStatus::Draft, QuoteStatus::Sent, QuoteStatus::Accepted])->sum('subtotal'),
             'target' => $this->target(),
         ];
@@ -128,7 +138,7 @@ class SalesReport
 
     public function byMonth(): Collection
     {
-        $orders = $this->orders()->groupBy(fn ($o) => $o->order_date->format('Y-m'));
+        $orders = $this->orders()->groupBy(fn ($o) => $o->salesDate()->format('Y-m'));
         $quotes = $this->quotes()->groupBy(fn ($q) => $q->quote_date->format('Y-m'));
 
         return $this->months()->map(function (CarbonImmutable $month) use ($orders, $quotes) {
@@ -195,10 +205,10 @@ class SalesReport
     /** Flat rows for CSV export: one row per sales order. */
     public function csvRows(): array
     {
-        $rows = [['Order', 'Date', 'Customer', 'Sales rep', 'Status', 'Sales ex VAT', 'Cost', 'GP', 'GP %', 'Commission', 'Total incl VAT']];
-        foreach ($this->orders()->sortBy('order_date') as $o) {
+        $rows = [['Order', 'Order date', 'Invoice', 'Invoice date', 'Customer', 'Sales rep', 'Status', 'Sales ex VAT', 'Cost', 'GP', 'GP %', 'Commission', 'Total incl VAT']];
+        foreach ($this->orders()->sortBy(fn ($o) => $o->salesDate()) as $o) {
             $rows[] = [
-                $o->number, $o->order_date->format('Y-m-d'), $o->customer?->name, $o->salesRep?->name ?? 'Unassigned',
+                $o->number, $o->order_date->format('Y-m-d'), $o->invoice_number, $o->invoice_date?->format('Y-m-d'), $o->customer?->name, $o->salesRep?->name ?? 'Unassigned',
                 $o->status->getLabel(), round((float) $o->subtotal, 2), round((float) $o->cost_total, 2), round((float) $o->gp_amount, 2),
                 (float) $o->subtotal > 0 ? round((float) $o->gp_amount / (float) $o->subtotal * 100, 1) : 0,
                 round((float) $o->commission_total, 2), round((float) $o->total, 2),

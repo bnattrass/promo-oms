@@ -51,7 +51,7 @@
     {{-- Headline numbers --}}
     <div class="sr-grid">
         <div class="sr-card">
-            <div class="sr-label">Sales (ex VAT)</div>
+            <div class="sr-label">Sales - invoiced (ex VAT)</div>
             <div class="sr-value">{{ $money($summary['sales']) }}</div>
             <div class="sr-sub">
                 {{ $summary['orders'] }} orders · avg {{ $money($summary['average_order']) }}
@@ -74,7 +74,12 @@
             <div class="sr-sub">{{ $money($summary['quote_value']) }} quoted · {{ $pct($summary['win_rate']) }} won</div>
         </div>
         <div class="sr-card">
-            <div class="sr-label">Open pipeline</div>
+            <div class="sr-label">Order book (not yet invoiced)</div>
+            <div class="sr-value">{{ $money($summary['order_book']['value']) }}</div>
+            <div class="sr-sub">{{ $summary['order_book']['count'] }} open order(s) · GP {{ $money($summary['order_book']['gp']) }}</div>
+        </div>
+        <div class="sr-card">
+            <div class="sr-label">Open quotes</div>
             <div class="sr-value">{{ $money($summary['open_pipeline']) }}</div>
             <div class="sr-sub">draft, sent and accepted quotes</div>
         </div>
@@ -160,5 +165,5 @@
         </x-filament::section>
     </div>
 
-    <p style="font-size:.8rem; opacity:.6">Sales = sales orders by order date, excluding cancelled orders, ex VAT. Quotes counted by quote date; win rate = converted ÷ (converted + declined + expired).</p>
+    <p style="font-size:.8rem; opacity:.6">Sales = orders marked as invoiced, by invoice date, ex VAT. Orders not yet invoiced show as the order book. Quotes counted by quote date; win rate = converted ÷ (converted + declined + expired).</p>
 </x-filament-panels::page>
