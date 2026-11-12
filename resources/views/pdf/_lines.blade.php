@@ -8,9 +8,9 @@
         <th style="width:14%">Code</th>
         <th>Description</th>
         <th class="num" style="width:8%">Qty</th>
-        <th class="num" style="width:13%">Unit</th>
-        @if($showSetup)<th class="num" style="width:12%">Setup</th>@endif
-        <th class="num" style="width:14%">Total</th>
+        <th class="num" style="width:13%">Unit price<br><span style="font-weight:normal;text-transform:none">excl. VAT</span></th>
+        @if($showSetup)<th class="num" style="width:12%">Setup<br><span style="font-weight:normal;text-transform:none">excl. VAT</span></th>@endif
+        <th class="num" style="width:14%">Total<br><span style="font-weight:normal;text-transform:none">excl. VAT</span></th>
     </tr>
     </thead>
     <tbody>
@@ -28,7 +28,7 @@
                         {{ $b['method_name'] ?? $b['branding_code'] ?? '' }}
                         @if(!empty($b['colours']) && $b['colours'] > 0) &middot; {{ $b['colours'] }} colour(s) @endif
                         @if(($b['placements'] ?? 1) > 1) &middot; x{{ $b['placements'] }} @endif
-                        @if(!empty($b['inclusive'])) &middot; inclusive branding @endif
+                        @if(!empty($b['inclusive']) && ! str_contains(strtolower($b['method_name'] ?? ''), 'inclusive')) &middot; branding included @endif
                         @if($costMode && !empty($b['priced_code'])) &middot; code {{ $b['print_code'] ?? $b['priced_code'] }} @endif
                     </div>
                 @endforeach
@@ -47,7 +47,8 @@
     </tbody>
 </table>
 
-<table class="totals" style="width:40%; margin-left:60%; margin-top:10px">
+<p class="muted" style="font-size:9px; margin:6px 0 0">All unit, setup and line prices exclude VAT.</p>
+<table class="totals" style="width:40%; margin-left:60%; margin-top:6px">
     <tr><td>Subtotal (excl. VAT)</td><td class="num">{{ $money($doc->subtotal) }}</td></tr>
     <tr><td>VAT ({{ rtrim(rtrim(number_format($company->vat_percent, 2), '0'), '.') }}%)</td><td class="num">{{ $money($doc->vat_total) }}</td></tr>
     <tr class="grand"><td>Total</td><td class="num">{{ $money($doc->total) }}</td></tr>

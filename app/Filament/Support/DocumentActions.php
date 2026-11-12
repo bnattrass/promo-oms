@@ -31,6 +31,21 @@ class DocumentActions
             });
     }
 
+    /** Internal cost / sell / GP sheet. Never emailed to customers. */
+    public static function costing(): Action
+    {
+        return Action::make('costing')
+            ->label('Costing sheet')
+            ->icon(Heroicon::OutlinedCalculator)
+            ->color('gray')
+            ->tooltip('Internal: cost, selling price and GP per line')
+            ->action(function (Quote|SalesOrder $record) {
+                $content = app(DocumentPdf::class)->renderCosting($record);
+
+                return response()->streamDownload(fn () => print ($content), "{$record->number}-costing.pdf", ['Content-Type' => 'application/pdf']);
+            });
+    }
+
     public static function email(string $templateKey, string $label): Action
     {
         return Action::make('email_'.$templateKey)

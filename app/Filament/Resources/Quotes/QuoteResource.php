@@ -117,8 +117,8 @@ class QuoteResource extends Resource
             $field('subtotal', 'Subtotal (ex VAT)'),
             $field('vat_total', 'VAT'),
             $field('total', 'Total (incl VAT)'),
-            $field('cost_total', 'Total cost'),
-            $field('gp_amount', 'GP'),
+            $field('cost_total', 'Total cost (ex VAT)'),
+            $field('gp_amount', 'GP - what we make'),
             $field('gp_percent', 'GP %', '%'),
             $field('commission_total', 'Commission'),
         ];
@@ -136,8 +136,12 @@ class QuoteResource extends Resource
                 TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('quote_date')->date('j M Y')->sortable(),
-                TextColumn::make('total')->money('ZAR')->sortable(),
+                TextColumn::make('subtotal')->label('Sell (ex VAT)')->money('ZAR')->sortable(),
+                TextColumn::make('cost_total')->label('Cost')->money('ZAR')->sortable()->toggleable(),
+                TextColumn::make('gp_amount')->label('GP')->money('ZAR')->sortable()
+                    ->color(fn ($state, Quote $record) => $record->gp_percent < 20 ? 'danger' : ($record->gp_percent < 30 ? 'warning' : 'success')),
                 TextColumn::make('gp_percent')->label('GP %')->suffix('%')->sortable(),
+                TextColumn::make('total')->label('Total (incl VAT)')->money('ZAR')->sortable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('next_follow_up_at')->label('Follow up')->since()->placeholder('-')->toggleable(),
             ])
             ->filters([

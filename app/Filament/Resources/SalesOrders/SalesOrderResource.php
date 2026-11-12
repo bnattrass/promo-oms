@@ -126,7 +126,9 @@ class SalesOrderResource extends Resource
                 TextColumn::make('order_date')->date('j M Y')->sortable(),
                 TextColumn::make('required_by')->date('j M Y')->sortable()
                     ->color(fn ($state, SalesOrder $record) => $state && $state->isPast() && $record->status->isOpen() ? 'danger' : null),
-                TextColumn::make('total')->money('ZAR')->sortable(),
+                TextColumn::make('subtotal')->label('Sell (ex VAT)')->money('ZAR')->sortable(),
+                TextColumn::make('gp_amount')->label('GP')->money('ZAR')->sortable(),
+                TextColumn::make('total')->label('Total (incl VAT)')->money('ZAR')->sortable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('invoice_number')->label('Invoice')->searchable()->placeholder('-')->toggleable(),
                 TextColumn::make('gp_percent')->label('GP %')->suffix('%')->toggleable(),
                 TextColumn::make('salesRep.name')->label('Rep')->toggleable(),

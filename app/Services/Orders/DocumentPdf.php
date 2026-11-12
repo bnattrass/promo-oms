@@ -17,6 +17,18 @@ class DocumentPdf
         return Pdf::loadView($this->view($document), $this->data($document))->setPaper('a4')->output();
     }
 
+    /** Internal costing sheet (cost, sell, GP per line) for a quote or sales order. */
+    public function renderCosting(Quote|SalesOrder $document): string
+    {
+        $document->loadMissing('company', 'lines', 'customer', 'salesRep');
+
+        return Pdf::loadView('pdf.costing', [
+            'doc' => $document,
+            'company' => $document->company,
+            'money' => fn ($v) => 'R '.number_format((float) $v, 2, '.', ' '),
+        ])->setPaper('a4', 'landscape')->output();
+    }
+
     public function filename(Quote|SalesOrder|PurchaseOrder $document): string
     {
         return "{$document->number}.pdf";

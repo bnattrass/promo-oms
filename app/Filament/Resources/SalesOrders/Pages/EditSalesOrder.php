@@ -135,6 +135,7 @@ class EditSalesOrder extends EditRecord
 
             DocumentActions::email('sales_order_confirmation', 'Email confirmation'),
             DocumentActions::pdf(),
+            DocumentActions::costing(),
 
             ActionGroup::make([
                 DocumentActions::email('deposit_reminder', 'Send deposit reminder')

@@ -47,6 +47,7 @@ class EditQuote extends EditRecord
         return [
             DocumentActions::email('quote_sent', 'Email quote')->after(fn () => $this->refreshTotals()),
             DocumentActions::pdf(),
+            DocumentActions::costing(),
 
             Action::make('convert')
                 ->label('Convert to sales order')
