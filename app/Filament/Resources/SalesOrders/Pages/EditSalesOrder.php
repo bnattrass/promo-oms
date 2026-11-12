@@ -7,6 +7,7 @@ use App\Enums\SalesOrderStatus;
 use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
 use App\Filament\Resources\SalesOrders\SalesOrderResource;
 use App\Filament\Support\DocumentActions;
+use App\Filament\Support\TopSaveAction;
 use App\Models\Activity;
 use App\Models\SalesOrder;
 use App\Services\Orders\PurchaseOrderGenerator;
@@ -43,6 +44,7 @@ class EditSalesOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            TopSaveAction::make($this),
             Action::make('deposit')
                 ->label('Record deposit')
                 ->icon(Heroicon::OutlinedBanknotes)

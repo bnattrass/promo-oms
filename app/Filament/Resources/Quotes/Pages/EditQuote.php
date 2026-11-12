@@ -6,6 +6,7 @@ use App\Enums\QuoteStatus;
 use App\Filament\Resources\Quotes\QuoteResource;
 use App\Filament\Resources\SalesOrders\SalesOrderResource;
 use App\Filament\Support\DocumentActions;
+use App\Filament\Support\TopSaveAction;
 use App\Models\Activity;
 use App\Models\Quote;
 use App\Services\Orders\QuoteConverter;
@@ -45,6 +46,7 @@ class EditQuote extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            TopSaveAction::make($this),
             DocumentActions::email('quote_sent', 'Email quote')->after(fn () => $this->refreshTotals()),
             DocumentActions::pdf(),
             DocumentActions::costing(),

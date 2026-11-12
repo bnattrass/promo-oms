@@ -7,6 +7,7 @@ use App\Enums\PurchaseOrderStatus;
 use App\Enums\SalesOrderStatus;
 use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
 use App\Filament\Support\DocumentActions;
+use App\Filament\Support\TopSaveAction;
 use App\Models\Activity;
 use App\Models\PurchaseOrder;
 use Filament\Actions\Action;
@@ -27,6 +28,7 @@ class EditPurchaseOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            TopSaveAction::make($this),
             DocumentActions::email('purchase_order', 'Email to supplier')
                 ->after(fn () => $this->refreshFormData(['status'])),
             DocumentActions::pdf(),
