@@ -30,6 +30,13 @@ class EmailTemplateResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
+
+    /** Admins only. */
+    public static function canViewAny(): bool
+    {
+        return \App\Support\Access::isAdmin();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([

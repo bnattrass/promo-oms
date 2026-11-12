@@ -143,7 +143,8 @@ class PricedLineForm
                 TextInput::make('gp_percent')->label('GP %')->numeric()->suffix('%')->required()->live(onBlur: true)
                     ->default(fn () => $owner instanceof Quote ? (float) ($owner->customer?->default_gp_percent ?? $owner->company?->default_gp_percent ?? 35) : 35),
                 TextInput::make('commission_percent')->label('Commission %')->numeric()->suffix('%')
-                    ->default(fn () => (float) ($owner->salesRep?->commission_percent ?? 0))->live(onBlur: true),
+                    ->default(fn () => (float) ($owner->salesRep?->commission_percent ?? 0))->live(onBlur: true)
+                    ->visible(fn () => \App\Support\Access::canSeeCommission($owner)),
                 TextInput::make('unit_price_override')->label('Fixed sell price / unit')->numeric()->prefix('R')
                     ->helperText('Optional. Overrides GP% - GP is then worked out from this price.')->live(onBlur: true)->columnSpan(2),
                 Hidden::make('line_type')->default('catalogue'),
@@ -197,7 +198,8 @@ class PricedLineForm
                 TextInput::make('unit_price_override')->label('Fixed sell price / unit')->numeric()->prefix('R')->live(onBlur: true)
                     ->helperText('Use this for own work (e.g. R650 per hour). Overrides GP%.')->columnSpan(2),
                 TextInput::make('commission_percent')->label('Commission %')->numeric()->suffix('%')
-                    ->default(fn () => (float) ($owner->salesRep?->commission_percent ?? 0))->live(onBlur: true),
+                    ->default(fn () => (float) ($owner->salesRep?->commission_percent ?? 0))->live(onBlur: true)
+                    ->visible(fn () => \App\Support\Access::canSeeCommission($owner)),
                 Hidden::make('extra_cost')->default(0),
                 Repeater::make('brandings')
                     ->label('Branding')
@@ -505,7 +507,7 @@ class PricedLineForm
             .'<div><div style="opacity:.6">Sell / unit (ex VAT)</div><strong>'.$r($p['unit_price']).'</strong></div>'
             .'<div><div style="opacity:.6">Setup sell</div><strong>'.$r($p['setup_price']).'</strong></div>'
             .'<div><div style="opacity:.6">Line total ex VAT / incl VAT</div><strong>'.$r($p['line_total']).' / '.$r($incl).'</strong></div>'
-            .'<div><div style="opacity:.6">Commission</div><strong>'.$r($p['commission_amount']).'</strong></div>'
+            .(\App\Support\Access::canSeeCommission($owner) ? '<div><div style="opacity:.6">Commission</div><strong>'.$r($p['commission_amount']).'</strong></div>' : '')
             .'</div>'.$warning
         );
     }

@@ -32,7 +32,7 @@
     </td>
     <td style="width:50%; text-align:right">
         <div class="muted">Sell (excl. VAT)</div><div class="big">{{ $money($doc->subtotal) }}</div>
-        <div class="muted" style="margin-top:4px">Cost {{ $money($doc->cost_total) }} · GP <b>{{ $money($doc->gp_amount) }}</b> ({{ $pct($doc->gp_percent) }}) · Commission {{ $money($doc->commission_total) }}</div>
+        <div class="muted" style="margin-top:4px">Cost {{ $money($doc->cost_total) }} · GP <b>{{ $money($doc->gp_amount) }}</b> ({{ $pct($doc->gp_percent) }})@if($showCommission ?? true) · Commission {{ $money($doc->commission_total) }}@endif</div>
     </td>
 </tr></table>
 
@@ -50,7 +50,7 @@
         <th class="num">Line sell</th>
         <th class="num">GP</th>
         <th class="num">GP %</th>
-        <th class="num">Comm.</th>
+        @if($showCommission ?? true)<th class="num">Comm.</th>@endif
     </tr></thead>
     <tbody>
     @foreach($doc->lines as $line)
@@ -80,7 +80,7 @@
             <td class="num">{{ $money($line->line_total) }}</td>
             <td class="num {{ $gpClass }}">{{ $money($line->gp_amount) }}</td>
             <td class="num {{ $gpClass }}">{{ $pct($line->gp_percent) }}</td>
-            <td class="num">{{ $money($line->commission_amount) }}</td>
+            @if($showCommission ?? true)<td class="num">{{ $money($line->commission_amount) }}</td>@endif
         </tr>
     @endforeach
     <tr class="tot">
@@ -90,7 +90,7 @@
         <td class="num">{{ $money($doc->subtotal) }}</td>
         <td class="num">{{ $money($doc->gp_amount) }}</td>
         <td class="num">{{ $pct($doc->gp_percent) }}</td>
-        <td class="num">{{ $money($doc->commission_total) }}</td>
+        @if($showCommission ?? true)<td class="num">{{ $money($doc->commission_total) }}</td>@endif
     </tr>
     </tbody>
 </table>

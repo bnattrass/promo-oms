@@ -81,7 +81,7 @@ class QuoteResource extends Resource
                     ->helperText('Printed on the quote and used as the email recipient'),
                 Select::make('sales_rep_id')->label('Sales rep')
                     ->options(fn () => CustomerResource::salesRepOptions())
-                    ->default(fn () => auth()->id()),
+                    ->default(fn () => auth()->user()?->is_sales_rep ? auth()->id() : null),
                 TextInput::make('reference')->placeholder('Event, campaign or customer ref'),
                 DatePicker::make('quote_date')->default(today())->required(),
                 DatePicker::make('valid_until')->default(fn () => today()->addDays(Filament::getTenant()?->quote_valid_days ?: 14)),
@@ -120,7 +120,7 @@ class QuoteResource extends Resource
             $field('cost_total', 'Total cost (ex VAT)'),
             $field('gp_amount', 'GP - what we make'),
             $field('gp_percent', 'GP %', '%'),
-            $field('commission_total', 'Commission'),
+            $field('commission_total', 'Commission')->visible(fn ($record) => \App\Support\Access::canSeeCommission($record)),
         ];
     }
 

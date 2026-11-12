@@ -50,7 +50,7 @@ class SalesReport extends Page
         $user = auth()->user();
         $role = $user?->roleIn(Filament::getTenant());
 
-        return $user?->is_super_admin || in_array($role, ['admin', 'accounts'], true);
+        return $user?->is_super_admin || $role === 'admin';
     }
 
     public function preset(string $period): void
@@ -78,7 +78,7 @@ class SalesReport extends Page
 
     public function repOptions(): array
     {
-        return Filament::getTenant()->users()->orderBy('name')->pluck('users.name', 'users.id')->all();
+        return Filament::getTenant()->users()->where('users.is_sales_rep', true)->orderBy('name')->pluck('users.name', 'users.id')->all();
     }
 
     protected function getViewData(): array

@@ -17,6 +17,11 @@ class EditCompanyProfile extends EditTenantProfile
         return 'Company settings';
     }
 
+    public static function canView(\Illuminate\Database\Eloquent\Model $tenant): bool
+    {
+        return auth()->user()?->isAdminOf($tenant) ?? false;
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([

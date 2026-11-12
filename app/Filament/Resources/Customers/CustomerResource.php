@@ -45,7 +45,8 @@ class CustomerResource extends Resource
 
     public static function salesRepOptions(): array
     {
-        return Filament::getTenant()?->users()->orderBy('name')->pluck('users.name', 'users.id')->all() ?? [];
+        return Filament::getTenant()?->users()->where('users.is_sales_rep', true)->where('users.is_active', true)
+            ->orderBy('name')->pluck('users.name', 'users.id')->all() ?? [];
     }
 
     public static function form(Schema $schema): Schema

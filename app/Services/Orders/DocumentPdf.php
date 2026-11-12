@@ -23,6 +23,7 @@ class DocumentPdf
         $document->loadMissing('company', 'lines', 'customer', 'salesRep');
 
         return Pdf::loadView('pdf.costing', [
+            'showCommission' => \App\Support\Access::canSeeCommission($document),
             'doc' => $document,
             'company' => $document->company,
             'money' => fn ($v) => 'R '.number_format((float) $v, 2, '.', ' '),

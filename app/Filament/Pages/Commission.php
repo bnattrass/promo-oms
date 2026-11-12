@@ -113,7 +113,7 @@ class Commission extends Page implements HasTable
                     ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null) ? $query->commission($data['value']) : $query),
                 SelectFilter::make('rep')
                     ->label('Sales rep')
-                    ->options(fn () => Filament::getTenant()->users()->orderBy('name')->pluck('users.name', 'users.id')->all())
+                    ->options(fn () => Filament::getTenant()->users()->where('users.is_sales_rep', true)->orderBy('name')->pluck('users.name', 'users.id')->all())
                     ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null) ? $query->where('sales_rep_id', $data['value']) : $query),
                 Filter::make('period')
                     ->schema([

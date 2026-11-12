@@ -18,7 +18,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'phone', 'password', 'is_super_admin', 'commission_percent', 'is_active', 'monthly_target'];
+    protected $fillable = ['name', 'email', 'phone', 'password', 'is_super_admin', 'commission_percent', 'is_active', 'is_sales_rep', 'monthly_target'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -30,6 +30,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             'is_super_admin' => 'boolean',
             'commission_percent' => 'decimal:2',
             'is_active' => 'boolean',
+            'is_sales_rep' => 'boolean',
             'monthly_target' => 'decimal:2',
         ];
     }

@@ -43,6 +43,13 @@ class SupplierResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+
+    /** Admins only. */
+    public static function canViewAny(): bool
+    {
+        return \App\Support\Access::isAdmin();
+    }
+
     public static function form(Schema $schema): Schema
     {
         $credentialSections = [];

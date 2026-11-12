@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -25,11 +26,8 @@ use UnitEnum;
 class TeamResource extends Resource
 {
     public const ROLES = [
-        'admin' => 'Admin (everything, incl. team and settings)',
-        'sales' => 'Sales',
-        'art' => 'Art department',
-        'production' => 'Production / dispatch',
-        'accounts' => 'Accounts',
+        'admin' => 'Admin - everything, incl. costs for all reps, commission, reports and settings',
+        'sales' => 'Sales - quoting and the order process; own figures and commission only',
     ];
 
     protected static ?string $model = User::class;
@@ -69,9 +67,13 @@ class TeamResource extends Resource
                 Toggle::make('is_active')->label('Can log in')->default(true),
             ]),
             Section::make('Sales')->columns(2)->schema([
+                Toggle::make('is_sales_rep')->label('This person is a sales rep')->live()->columnSpanFull()
+                    ->helperText('Sales reps appear in the rep pickers on quotes and customers, in sales reports, performance cards and commission.'),
                 TextInput::make('commission_percent')->label('Commission (% of GP)')->numeric()->suffix('%')->default(0)
+                    ->visible(fn (Get $get) => (bool) $get('is_sales_rep'))
                     ->helperText('Default for this rep on new quote lines; can be changed per line'),
-                TextInput::make('monthly_target')->label('Monthly sales target (ex VAT)')->numeric()->prefix('R'),
+                TextInput::make('monthly_target')->label('Monthly sales target (ex VAT)')->numeric()->prefix('R')
+                    ->visible(fn (Get $get) => (bool) $get('is_sales_rep')),
             ]),
         ]);
     }
@@ -86,6 +88,7 @@ class TeamResource extends Resource
                 TextColumn::make('role')->badge()
                     ->getStateUsing(fn (User $record) => $record->roleIn(Filament::getTenant()))
                     ->formatStateUsing(fn (?string $state) => $state ? str(self::ROLES[$state] ?? $state)->before(' (')->toString() : '-'),
+                IconColumn::make('is_sales_rep')->label('Sales rep')->boolean(),
                 TextColumn::make('commission_percent')->label('Commission')->suffix('%'),
                 TextColumn::make('monthly_target')->label('Target')->money('ZAR')->placeholder('-'),
                 IconColumn::make('is_active')->label('Active')->boolean(),

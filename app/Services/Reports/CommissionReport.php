@@ -30,6 +30,7 @@ class CommissionReport
             ->whereHas('companies', fn ($q) => $q->whereKey($this->companyId))
             ->when($onlyRepId, fn ($q) => $q->whereKey($onlyRepId))
             ->where('is_active', true)
+            ->where('is_sales_rep', true)
             ->orderBy('name')
             ->get(['id', 'name', 'commission_percent', 'monthly_target']);
 

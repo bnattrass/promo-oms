@@ -78,7 +78,8 @@ class PricedLinesTable
                 TextColumn::make('setup_price')->label('Setup sell')->money('ZAR')->toggleable(),
                 TextColumn::make('line_total')->label('Line total')->money('ZAR')->weight('bold'),
                 TextColumn::make('gp_amount')->label('GP')->money('ZAR')->toggleable(),
-                TextColumn::make('commission_amount')->label('Comm.')->money('ZAR')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('commission_amount')->label('Comm.')->money('ZAR')->toggleable(isToggledHiddenByDefault: true)
+                    ->visible(fn () => \App\Support\Access::canSeeCommission($owner)),
                 ...($owner instanceof SalesOrder ? [TextColumn::make('stage')->badge()] : []),
             ])
             ->headerActions($editable ? [

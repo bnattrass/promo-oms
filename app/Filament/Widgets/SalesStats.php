@@ -14,6 +14,11 @@ class SalesStats extends StatsOverviewWidget
 {
     protected static ?int $sort = 2;
 
+    public static function canView(): bool
+    {
+        return \App\Support\Access::isAdmin();
+    }
+
     protected function getStats(): array
     {
         $companyId = Filament::getTenant()?->id;
