@@ -45,7 +45,7 @@ class PurchaseOrderGenerator
                         'description' => $line->description,
                         'brandings' => collect($line->brandings)->map(fn ($b) => array_intersect_key($b, array_flip([
                             'position_code', 'position_name', 'branding_code', 'priced_code', 'print_code',
-                            'method_name', 'colours', 'placements', 'inclusive', 'unit_cost', 'setup_cost',
+                            'method_name', 'colours', 'placements', 'inclusive', 'unit_cost', 'setup_cost', 'unit_cost_override', 'setup_override',
                         ])))->values()->all(),
                         'quantity' => $line->quantity,
                         'unit_cost' => round((float) $line->unit_cost + (float) $line->branding_unit_cost, 4),

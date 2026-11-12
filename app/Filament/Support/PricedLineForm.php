@@ -7,6 +7,7 @@ use App\Models\BrandingMethod;
 use App\Models\BrandingPosition;
 use App\Models\InclusiveBranding;
 use App\Models\Product;
+use App\Models\Supplier;
 use App\Models\ProductVariant;
 use App\Models\Quote;
 use App\Models\SalesOrder;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -38,11 +40,19 @@ class PricedLineForm
 
         return [
             Section::make('Item')->columns(4)->schema([
+                ToggleButtons::make('catalogue_supplier')
+                    ->label('Search in')
+                    ->options(fn () => ['all' => 'All suppliers'] + Supplier::where('is_active', true)->whereHas('products')->orderBy('name')->pluck('name', 'id')->mapWithKeys(fn ($n, $id) => [(string) $id => $n])->all())
+                    ->default('all')
+                    ->inline()
+                    ->live()
+                    ->dehydrated(false)
+                    ->columnSpan(4),
                 Select::make('product_variant_id')
                     ->label('Catalogue item')
                     ->placeholder('Search by code or name, or leave empty for a custom item')
                     ->searchable()
-                    ->getSearchResultsUsing(fn (string $search) => static::searchVariants($search))
+                    ->getSearchResultsUsing(fn (string $search, Get $get) => static::searchVariants($search, $get('catalogue_supplier')))
                     ->getOptionLabelUsing(fn ($value) => static::variantLabel(ProductVariant::with('product')->find($value)))
                     ->live()
                     ->afterStateUpdated(function (?string $state, Set $set, Get $get) {
@@ -159,8 +169,26 @@ class PricedLineForm
                         }
                     }),
                 TextInput::make('description')->required()->columnSpan(3)
-                    ->placeholder('e.g. Courier to Johannesburg, Logo vectorising, Artwork design (2 hours)'),
-                TextInput::make('item_code')->label('Code (optional)'),
+                    ->placeholder(fn (Get $get) => $get('line_type') === LineType::Branded->value
+                        ? 'e.g. Navy 250ml stainless steel tumbler'
+                        : 'e.g. Courier to Johannesburg, Logo vectorising, Artwork design (2 hours)'),
+                Select::make('supplier_id')->label('Supplier')
+                    ->options(fn () => Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                    ->searchable()
+                    ->required(fn (Get $get) => $get('line_type') === LineType::Branded->value)
+                    ->helperText('Purchase orders are created per supplier')
+                    ->createOptionForm([
+                        TextInput::make('name')->required(),
+                        TextInput::make('code')->required()->maxLength(20)->unique('suppliers', 'code')
+                            ->dehydrateStateUsing(fn (?string $state) => strtoupper((string) $state))
+                            ->helperText('Short code, e.g. BARRON'),
+                        TextInput::make('order_email')->email()->label('Order email (POs go here)'),
+                        TextInput::make('contact_person'),
+                        TextInput::make('phone')->tel(),
+                    ])
+                    ->createOptionUsing(fn (array $data) => Supplier::create($data + ['is_active' => true])->getKey())
+                    ->columnSpan(2),
+                TextInput::make('item_code')->label(fn (Get $get) => $get('line_type') === LineType::Branded->value ? "Supplier's item code" : 'Code (optional)'),
                 TextInput::make('quantity')->numeric()->minValue(1)->default(1)->required()->live(onBlur: true),
                 TextInput::make('unit_cost')->label('Your cost / unit (ex VAT)')->numeric()->prefix('R')->default(0)->live(onBlur: true)
                     ->helperText('What it costs you, e.g. the courier quote. 0 for own work.'),
@@ -171,6 +199,23 @@ class PricedLineForm
                 TextInput::make('commission_percent')->label('Commission %')->numeric()->suffix('%')
                     ->default(fn () => (float) ($owner->salesRep?->commission_percent ?? 0))->live(onBlur: true),
                 Hidden::make('extra_cost')->default(0),
+                Repeater::make('brandings')
+                    ->label('Branding')
+                    ->visible(fn (Get $get) => $get('line_type') === LineType::Branded->value)
+                    ->addActionLabel('Add branding')
+                    ->defaultItems(1)
+                    ->columns(4)
+                    ->columnSpanFull()
+                    ->live()
+                    ->itemLabel(fn (array $state) => $state['method_name'] ?? null)
+                    ->schema([
+                        TextInput::make('method_name')->label('Branding description')->columnSpan(2)
+                            ->placeholder('e.g. Screen print 1 colour, front'),
+                        TextInput::make('unit_cost_override')->label('Branding cost / unit')->numeric()->prefix('R')->default(0)->live(onBlur: true),
+                        TextInput::make('setup_override')->label('Setup cost')->numeric()->prefix('R')->default(0)->live(onBlur: true),
+                        Hidden::make('position_name')->default('Branding'),
+                        Hidden::make('placements')->default(1),
+                    ]),
                 Grid::make(1)->columnSpanFull()->schema([
                     Text::make(fn (Get $get) => static::preview($get, $owner, $setupSeparately)),
                 ]),
@@ -265,11 +310,12 @@ class PricedLineForm
 
     // ------------------------------------------------------------------ helpers
 
-    public static function searchVariants(string $search): array
+    public static function searchVariants(string $search, ?string $supplierId = null): array
     {
         return ProductVariant::query()
-            ->with('product')
+            ->with('product', 'supplier:id,code')
             ->where('is_active', true)
+            ->when($supplierId && $supplierId !== 'all', fn ($query) => $query->where('supplier_id', $supplierId))
             ->where(fn ($query) => $query->where('full_code', 'like', "%{$search}%")
                 ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$search}%")->orWhere('simple_code', 'like', "%{$search}%")))
             ->orderBy('full_code')
@@ -286,6 +332,7 @@ class PricedLineForm
         }
 
         return implode(' | ', array_filter([
+            $v->supplier?->code,
             $v->full_code,
             $v->product?->name,
             trim($v->colour_name.' '.$v->size) ?: null,

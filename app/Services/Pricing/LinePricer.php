@@ -32,14 +32,15 @@ class LinePricer
         $brandings = [];
 
         foreach ($line['brandings'] ?? [] as $b) {
-            if (blank($b['branding_code'] ?? null)) {
+            // Skip empty rows; a row without a supplier code still counts when costs were entered by hand.
+            if (blank($b['branding_code'] ?? null) && blank($b['unit_cost_override'] ?? null) && blank($b['setup_override'] ?? null)) {
                 continue;
             }
             $placements = max(1, (int) ($b['placements'] ?? 1));
             $colours = filled($b['colours'] ?? null) ? (int) $b['colours'] : null;
-            $code = ! empty($b['inclusive']) && filled($b['replacement_code'] ?? null) ? $b['replacement_code'] : $b['branding_code'];
+            $code = ! empty($b['inclusive']) && filled($b['replacement_code'] ?? null) ? $b['replacement_code'] : ($b['branding_code'] ?? null);
 
-            $break = $supplierId ? $this->lookup->find($supplierId, $code, $qty, $colours) : null;
+            $break = $supplierId && filled($code) ? $this->lookup->find($supplierId, $code, $qty, $colours) : null;
 
             // Manual override (e.g. a supplier without an API, or a negotiated price)
             $bUnit = isset($b['unit_cost_override']) && $b['unit_cost_override'] !== '' ? (float) $b['unit_cost_override'] : (float) ($break?->price ?? 0);

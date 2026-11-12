@@ -7,6 +7,7 @@ use Filament\Support\Contracts\HasLabel;
 enum LineType: string implements HasLabel
 {
     case Catalogue = 'catalogue';
+    case Branded = 'branded';
     case Courier = 'courier';
     case Design = 'design';
     case Setup = 'setup';
@@ -17,6 +18,7 @@ enum LineType: string implements HasLabel
     {
         return match ($this) {
             self::Catalogue => 'Catalogue item',
+            self::Branded => 'Branded item (other supplier)',
             self::Courier => 'Courier / delivery',
             self::Design => 'Design / artwork',
             self::Setup => 'Setup / origination',
