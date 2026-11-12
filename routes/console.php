@@ -9,11 +9,16 @@ use Illuminate\Support\Facades\Schedule;
 */
 $tz = 'Africa/Johannesburg';
 
-Schedule::command('suppliers:sync --module=categories --module=brands --module=branding_prices --module=inclusive_brandings --module=products --module=prices')
+Schedule::command('suppliers:sync --module=categories --module=brands --module=branding_prices --module=inclusive_brandings --module=products')
     ->dailyAt('01:15')->timezone($tz)->withoutOverlapping(120)->onOneServer()
     ->skip(fn () => now($tz)->isSunday());
 
-Schedule::command('suppliers:sync --full --module=categories --module=brands --module=branding_prices --module=inclusive_brandings --module=products --module=prices')
+// Prices: a FULL import every night (the feed is small). A changes-only sync misses prices for
+// products that were newly added to the catalogue since the last full price import.
+Schedule::command('suppliers:sync --full --module=prices')
+    ->dailyAt('02:15')->timezone($tz)->withoutOverlapping(60)->onOneServer();
+
+Schedule::command('suppliers:sync --full --module=categories --module=brands --module=branding_prices --module=inclusive_brandings --module=products')
     ->weeklyOn(0, '01:30')->timezone($tz)->withoutOverlapping(180)->onOneServer();
 
 Schedule::command('suppliers:sync --full --module=stock')

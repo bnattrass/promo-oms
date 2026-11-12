@@ -61,7 +61,18 @@ class SupplierSyncService
             $modules = array_values(array_intersect($modules, $only));
         }
 
-        return array_map(fn ($module) => $this->run($supplier, $module, $mode), $modules);
+        $runs = [];
+        foreach ($modules as $module) {
+            $runs[] = $run = $this->run($supplier, $module, $mode);
+
+            // New products arrive without prices; if prices aren't part of this run, fetch them in full now.
+            if ($module === 'products' && $run->records_created > 0 && ! in_array('prices', $modules, true)
+                && in_array('prices', $supplier->connector()::modules(), true)) {
+                $runs[] = $this->run($supplier, 'prices', 'full');
+            }
+        }
+
+        return $runs;
     }
 
     private function flagFullSync(Supplier $supplier, string $module, bool $needed): void
