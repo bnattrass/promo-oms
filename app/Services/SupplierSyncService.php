@@ -40,17 +40,17 @@ class SupplierSyncService
             $connector->sync($module, $mode, $run);
             $message = $run->fresh()->message;
 
+            $run->finish('success', $message);
+            $this->flagFullSync($supplier, $module, false);
+
             // After branding prices or products change, flag any branding methods left without prices.
             if (in_array($module, ['branding_prices', 'products'], true)
                 && ($gap = app(\App\Services\Pricing\BrandingCoverage::class)->summary($supplier))) {
-                $message = trim(($message ? $message.'; ' : '').$gap);
+                $run->update(['message' => trim(($message ? $message.'; ' : '').$gap)]);
                 if ($module === 'branding_prices' && $mode === 'changes') {
-                    $this->flagFullSync($supplier, 'branding_prices', true); // next run fetches everything
+                    $this->flagFullSync($supplier->refresh(), 'branding_prices', true); // next run fetches everything
                 }
             }
-
-            $run->finish('success', $message);
-            $this->flagFullSync($supplier, $module, false);
         } catch (SupplierUnavailableException $e) {
             $run->finish('skipped', $e->getMessage());
         } catch (Throwable $e) {
