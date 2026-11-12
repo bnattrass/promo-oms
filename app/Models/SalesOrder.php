@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CommissionStatus;
 use App\Enums\SalesOrderStatus;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\HasDocumentNumber;
@@ -34,6 +35,8 @@ class SalesOrder extends Model
             'deposit_received_at' => 'datetime',
             'invoice_date' => 'date',
             'invoiced_amount' => 'decimal:2',
+            'commission_paid_at' => 'date',
+            'commission_paid_amount' => 'decimal:2',
         ];
     }
 
@@ -80,6 +83,36 @@ class SalesOrder extends Model
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'subject')->latest();
+    }
+
+    /** Commission is due once the order is invoiced (or closed), and paid when commission_paid_at is set. */
+    public function commissionStatus(): CommissionStatus
+    {
+        if ($this->commission_paid_at) {
+            return CommissionStatus::Paid;
+        }
+
+        return in_array($this->status, [SalesOrderStatus::Invoiced, SalesOrderStatus::Closed], true)
+            ? CommissionStatus::Unpaid
+            : CommissionStatus::NotDue;
+    }
+
+    /** Query scope: orders whose commission is in the given state. */
+    public function scopeCommission(\Illuminate\Database\Eloquent\Builder $query, CommissionStatus|string $status): \Illuminate\Database\Eloquent\Builder
+    {
+        $status = $status instanceof CommissionStatus ? $status : CommissionStatus::from($status);
+        $invoiced = [SalesOrderStatus::Invoiced->value, SalesOrderStatus::Closed->value];
+
+        return match ($status) {
+            CommissionStatus::Paid => $query->whereNotNull('commission_paid_at'),
+            CommissionStatus::Unpaid => $query->whereNull('commission_paid_at')->whereIn('status', $invoiced),
+            CommissionStatus::NotDue => $query->whereNull('commission_paid_at')->whereNotIn('status', $invoiced),
+        };
+    }
+
+    public function commissionPaidBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'commission_paid_by');
     }
 
     public function depositOutstanding(): float

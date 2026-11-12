@@ -130,6 +130,11 @@ class SalesOrderResource extends Resource
                 TextColumn::make('gp_amount')->label('GP')->money('ZAR')->sortable(),
                 TextColumn::make('total')->label('Total (incl VAT)')->money('ZAR')->sortable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('invoice_number')->label('Invoice')->searchable()->placeholder('-')->toggleable(),
+                TextColumn::make('commission_state')->label('Commission')->badge()
+                    ->getStateUsing(fn (SalesOrder $record) => (float) $record->commission_total > 0 ? $record->commissionStatus() : null)
+                    ->placeholder('-')
+                    ->visible(fn () => auth()->user()?->isAdminOf(\Filament\Facades\Filament::getTenant()))
+                    ->toggleable(),
                 TextColumn::make('gp_percent')->label('GP %')->suffix('%')->toggleable(),
                 TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
             ])

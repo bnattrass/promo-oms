@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SalesOrders\Pages;
 
+use App\Enums\CommissionStatus;
 use App\Enums\SalesOrderStatus;
 use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
 use App\Filament\Resources\SalesOrders\SalesOrderResource;
@@ -14,6 +15,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
@@ -138,6 +140,36 @@ class EditSalesOrder extends EditRecord
             DocumentActions::costing(),
 
             ActionGroup::make([
+                Action::make('commissionPaid')
+                    ->label(fn () => 'Commission: mark paid (R '.number_format((float) $this->record->commission_total, 2).')')
+                    ->icon(Heroicon::OutlinedBanknotes)
+                    ->visible(fn () => auth()->user()?->isAdminOf(Filament::getTenant()) && ! $this->record->commission_paid_at && (float) $this->record->commission_total > 0)
+                    ->fillForm(fn () => ['paid_on' => today(), 'amount' => $this->record->commission_total])
+                    ->schema([
+                        DatePicker::make('paid_on')->label('Paid on')->required(),
+                        TextInput::make('amount')->label('Amount paid')->prefix('R')->numeric()->required(),
+                        TextInput::make('reference')->label('Payment reference'),
+                    ])
+                    ->modalDescription(fn () => $this->record->commissionStatus() === CommissionStatus::NotDue ? 'Note: this order is not invoiced yet.' : null)
+                    ->action(function (array $data) {
+                        $this->record->update([
+                            'commission_paid_at' => $data['paid_on'],
+                            'commission_paid_amount' => $data['amount'],
+                            'commission_paid_reference' => $data['reference'] ?? null,
+                            'commission_paid_by' => auth()->id(),
+                        ]);
+                        Activity::log($this->record, 'commission', 'Commission of R '.number_format((float) $data['amount'], 2).' marked paid');
+                        Notification::make()->success()->title('Commission marked paid')->send();
+                    }),
+                Action::make('commissionUnpaid')
+                    ->label(fn () => 'Commission: paid '.$this->record->commission_paid_at?->format('j M Y').' - undo')
+                    ->icon(Heroicon::OutlinedArrowUturnLeft)
+                    ->visible(fn () => auth()->user()?->isAdminOf(Filament::getTenant()) && (bool) $this->record->commission_paid_at)
+                    ->requiresConfirmation()
+                    ->action(function () {
+                        $this->record->update(['commission_paid_at' => null, 'commission_paid_amount' => null, 'commission_paid_reference' => null, 'commission_paid_by' => null]);
+                        Activity::log($this->record, 'commission', 'Commission payment undone');
+                    }),
                 DocumentActions::email('deposit_reminder', 'Send deposit reminder')
                     ->visible(fn () => $this->record->depositOutstanding() > 0),
                 Action::make('cancel')->label('Cancel order')->color('danger')->icon(Heroicon::OutlinedXCircle)

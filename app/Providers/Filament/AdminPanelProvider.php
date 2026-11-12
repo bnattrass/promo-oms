@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Tenancy\EditCompanyProfile;
 use App\Filament\Widgets\OpenOrdersTable;
+use App\Filament\Widgets\RepPerformance;
 use App\Filament\Widgets\SalesStats;
 use App\Filament\Widgets\WorkflowBoard;
 use App\Models\Company;
@@ -43,7 +44,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([Dashboard::class])
-            ->widgets([WorkflowBoard::class, SalesStats::class, OpenOrdersTable::class])
+            ->widgets([WorkflowBoard::class, RepPerformance::class, SalesStats::class, OpenOrdersTable::class])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
