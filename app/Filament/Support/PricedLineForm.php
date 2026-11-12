@@ -18,7 +18,6 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -81,37 +80,39 @@ class PricedLineForm
                                 ->afterStateUpdated(function (?string $state, Set $set, Get $get) {
                                     $position = static::position($get('../../product_id'), $state);
                                     $set('position_name', $position?->name);
-                                    $set('branding_code', null);
-                                    $set('method_name', null);
+                                    $set('method_choice', null);
+                                    static::applyMethodChoice(null, $set, $get);
                                     $set('placements', 1);
                                 })
                                 ->required(fn (Get $get) => filled($get('../../product_id'))),
-                            Select::make('branding_code')->label('Method')->columnSpan(2)
-                                ->options(fn (Get $get) => static::methodOptions($get('../../product_id'), $get('position_code'), $get('../../product_variant_id')))
-                                ->live()
-                                ->afterStateUpdated(function (?string $state, Set $set, Get $get) {
-                                    $method = static::position($get('../../product_id'), $get('position_code'))
-                                        ?->methods->firstWhere('branding_code', $state);
-                                    $set('method_name', $method?->name);
-                                    $set('method_inclusive', (bool) data_get($method?->raw, 'brandingInclusiveMethod', false));
-                                    $set('colours', null);
-                                    $inclusive = static::inclusiveFor($get('../../supplier_id'), $get('../../product_id'), $get('position_code'), $state);
-                                    $set('replacement_code', $inclusive?->replacement_code);
+                            Select::make('method_choice')->label('Method')->columnSpan(2)
+                                ->options(fn (Get $get) => static::methodOptions(
+                                    $get('../../product_id'), $get('position_code'), $get('../../product_variant_id'), $get('../../supplier_id')))
+                                ->disableOptionWhen(fn (string $value, Get $get) => static::inclusiveBelowMinimum($value, $get('../../quantity')))
+                                ->afterStateHydrated(function (Select $component, $state, Get $get) {
+                                    if (blank($state) && filled($get('branding_code'))) {
+                                        $component->state($get('inclusive') && $get('inclusive_id')
+                                            ? 'INC:'.$get('inclusive_id').':'.$get('branding_code')
+                                            : $get('branding_code'));
+                                    }
                                 })
+                                ->live()
+                                ->afterStateUpdated(fn (?string $state, Set $set, Get $get) => static::applyMethodChoice($state, $set, $get))
                                 ->required(fn (Get $get) => filled($get('../../product_id')))
                                 ->hidden(fn (Get $get) => blank($get('../../product_id'))),
+                            Hidden::make('branding_code')->visible(fn (Get $get) => filled($get('../../product_id'))),
                             TextInput::make('branding_code')->label('Branding code')->columnSpan(2)
                                 ->visible(fn (Get $get) => blank($get('../../product_id'))),
                             Select::make('colours')->label('Colours')
                                 ->options(fn (Get $get) => static::colourOptions($get('../../supplier_id'), $get('branding_code')))
                                 ->placeholder('n/a')
+                                ->disabled(fn (Get $get) => (bool) $get('inclusive'))
+                                ->dehydrated()
+                                ->helperText(fn (Get $get) => $get('inclusive') ? 'Set by the inclusive offer' : null)
                                 ->live(),
                             TextInput::make('placements')->label('Placements')->numeric()->minValue(1)->default(1)
                                 ->maxValue(fn (Get $get) => static::position($get('../../product_id'), $get('position_code'))?->multiplier ?? 9)
                                 ->live(onBlur: true),
-                            Toggle::make('inclusive')->label('Use inclusive branding special')->columnSpan(3)->live()
-                                ->visible(fn (Get $get) => filled($get('replacement_code'))
-                                    || static::inclusiveFor($get('../../supplier_id'), $get('../../product_id'), $get('position_code'), $get('branding_code'))),
                             TextInput::make('unit_cost_override')->label('Unit cost override')->numeric()->prefix('R')
                                 ->helperText('Only if not priced by the supplier')->live(onBlur: true),
                             TextInput::make('setup_override')->label('Setup override')->numeric()->prefix('R')->live(onBlur: true),
@@ -120,6 +121,8 @@ class PricedLineForm
                             Hidden::make('method_name'),
                             Hidden::make('replacement_code'),
                             Hidden::make('method_inclusive'),
+                            Hidden::make('inclusive'),
+                            Hidden::make('inclusive_id'),
                         ]),
                 ]),
 
@@ -323,22 +326,92 @@ class PricedLineForm
             ->all();
     }
 
-    public static function methodOptions(?string $productId, ?string $positionCode, ?string $variantId): array
+    /**
+     * Methods for a position, plus any Amrod inclusive offers ("Inclusive of 1 colour, 1 position pad printing")
+     * that apply to this product, position and item colour. Inclusive keys look like "INC:<id>:<code>".
+     */
+    public static function methodOptions(?string $productId, ?string $positionCode, ?string $variantId, ?string $supplierId = null): array
     {
         $position = static::position($productId, $positionCode);
         if (! $position) {
             return [];
         }
         $colour = $variantId ? ProductVariant::whereKey($variantId)->value('colour_code') : null;
+        $methods = $position->methods->filter(fn (BrandingMethod $m) => $m->allowsColour($colour));
 
-        return $position->methods
-            ->filter(fn (BrandingMethod $m) => $m->allowsColour($colour))
-            ->mapWithKeys(fn (BrandingMethod $m) => [$m->branding_code => $m->name
+        $options = [];
+        foreach (static::inclusiveOffers($supplierId, $productId, $positionCode, $colour, $methods->pluck('branding_code')->all()) as $offer) {
+            $options['INC:'.$offer->external_id.':'.$offer->branding_code] = '★ '.$offer->label()
+                .($offer->min_quantity > 1 ? " - from {$offer->min_quantity} units" : '');
+        }
+        foreach ($methods as $m) {
+            $options[$m->branding_code] = $m->name
                 .($m->max_colours > 0 ? " (max {$m->max_colours} col)" : '')
                 .(is_string(data_get($m->raw, 'numberOfColours')) && ! is_numeric(data_get($m->raw, 'numberOfColours')) ? ' · '.data_get($m->raw, 'numberOfColours') : '')
-                .($m->max_print_size ? " · {$m->max_print_size}" : '')
-                .(data_get($m->raw, 'brandingInclusiveMethod') ? ' · inclusive' : '')])
-            ->all();
+                .($m->max_print_size ? " · {$m->max_print_size}" : '');
+        }
+
+        return $options;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, InclusiveBranding> one offer per inclusive id + code */
+    public static function inclusiveOffers(?string $supplierId, ?string $productId, ?string $positionCode, ?string $colour, array $codes)
+    {
+        if (! $supplierId || ! $productId || ! $codes) {
+            return collect();
+        }
+        $simpleCode = once(fn () => Product::whereKey($productId)->value('simple_code'));
+
+        return InclusiveBranding::query()
+            ->where('supplier_id', $supplierId)
+            ->where('product_code', $simpleCode)
+            ->whereIn('branding_code', $codes)
+            ->get()
+            ->filter(fn (InclusiveBranding $i) => $i->appliesTo($positionCode, $colour))
+            ->unique(fn (InclusiveBranding $i) => $i->external_id.'|'.$i->branding_code)
+            ->values();
+    }
+
+    public static function inclusiveBelowMinimum(string $value, mixed $quantity): bool
+    {
+        if (! str_starts_with($value, 'INC:')) {
+            return false;
+        }
+        [, $id, $code] = explode(':', $value, 3);
+        $min = once(fn () => (int) InclusiveBranding::where('external_id', $id)->where('branding_code', $code)->min('min_quantity'));
+
+        return (int) $quantity < max(1, $min);
+    }
+
+    /** Fill the branding row from the chosen method or inclusive offer. */
+    public static function applyMethodChoice(?string $choice, Set $set, Get $get): void
+    {
+        $productId = $get('../../product_id');
+        $position = static::position($productId, $get('position_code'));
+
+        if ($choice && str_starts_with($choice, 'INC:')) {
+            [, $id, $code] = explode(':', $choice, 3);
+            $offer = InclusiveBranding::where('external_id', $id)->where('branding_code', $code)->first();
+            $method = $position?->methods->firstWhere('branding_code', $code);
+            $set('branding_code', $code);
+            $set('inclusive', true);
+            $set('inclusive_id', $id);
+            $set('replacement_code', $offer?->replacement_code);
+            $set('colours', $offer?->number_of_colours);
+            $set('method_inclusive', false);
+            $set('method_name', trim(($method?->name ?? $code).' - '.($offer?->description ? trim($offer->description) : 'inclusive')));
+
+            return;
+        }
+
+        $method = $choice ? $position?->methods->firstWhere('branding_code', $choice) : null;
+        $set('branding_code', $choice);
+        $set('inclusive', false);
+        $set('inclusive_id', null);
+        $set('replacement_code', null);
+        $set('colours', null);
+        $set('method_inclusive', (bool) data_get($method?->raw, 'brandingInclusiveMethod', false));
+        $set('method_name', $method?->name);
     }
 
     public static function colourOptions(?string $supplierId, ?string $brandingCode): array
@@ -349,21 +422,6 @@ class PricedLineForm
 
         return collect(app(BrandingPriceLookup::class)->colourOptions((int) $supplierId, $brandingCode))
             ->mapWithKeys(fn ($c) => [$c => $c.' colour'.($c > 1 ? 's' : '')])->all();
-    }
-
-    public static function inclusiveFor(?string $supplierId, ?string $productId, ?string $positionCode, ?string $brandingCode): ?InclusiveBranding
-    {
-        if (! $supplierId || ! $productId) {
-            return null;
-        }
-        $simpleCode = once(fn () => \App\Models\Product::whereKey($productId)->value('simple_code'));
-
-        return InclusiveBranding::query()
-            ->where('supplier_id', $supplierId)
-            ->where('product_code', $simpleCode)
-            ->when($positionCode, fn ($query) => $query->where(fn ($w) => $w->whereNull('position_code')->orWhere('position_code', $positionCode)))
-            ->when($brandingCode, fn ($query) => $query->where(fn ($w) => $w->whereNull('branding_code')->orWhere('branding_code', $brandingCode)))
-            ->first();
     }
 
     public static function preview(Get $get, Quote|SalesOrder $owner, bool $setupSeparately): HtmlString
@@ -383,7 +441,11 @@ class PricedLineForm
         $r = fn ($v) => 'R '.number_format((float) $v, 2, '.', ' ');
 
         $missing = collect($p['brandings'])->filter(fn ($b) => ! $b['price_found'] && empty($b['inclusive']) && empty($b['method_inclusive']) && ! isset($b['unit_cost_override']))->pluck('branding_code')->filter();
-        $warning = $missing->isNotEmpty()
+        $inclusiveCount = collect($p['brandings'])->where('inclusive', true)->count();
+        $warning = $inclusiveCount > 1
+            ? '<div style="color:#b45309;margin-top:6px">Inclusive offers usually cover one position only - check with the supplier before quoting '.$inclusiveCount.' positions as included.</div>'
+            : '';
+        $warning .= $missing->isNotEmpty()
             ? '<div style="color:#b45309;margin-top:6px">No supplier branding price found for: '.e($missing->implode(', ')).'. Enter an override or check the branding price sync.</div>'
             : '';
 

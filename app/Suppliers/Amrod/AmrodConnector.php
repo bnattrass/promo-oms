@@ -277,45 +277,75 @@ class AmrodConnector implements SupplierConnector
         return $counts;
     }
 
+    /**
+     * Inclusive branding (live payload): one flat row per product colour, e.g.
+     * {inclusiveBrandingId, inclusiveBrandingName, brandingPositions: "A^B^C", brandingCode: "PA",
+     *  brandingReplacementCode: "PA-FREE", numberOfColours: 1, simpleCode, colour: "BL", minQuantity, validFrom, validTo}
+     */
     private function importInclusiveBrandings(array $rows, string $mode): array
     {
         $counts = ['created' => 0, 'updated' => 0, 'deleted' => 0];
 
-        DB::transaction(function () use ($rows, $mode, &$counts) {
+        // Rows may also arrive grouped per product with a nested list.
+        $flat = [];
+        foreach ($rows as $row) {
+            $nested = F::pick($row, 'inclusiveBranding', 'inclusiveBrandings');
+            if (is_array($nested) && array_is_list($nested)) {
+                foreach ($nested as $n) {
+                    $flat[] = (is_array($n) ? $n : []) + ['simpleCode' => F::string($row, 'simpleCode', 'productCode'), 'actionType' => F::int($row, 'actionType')];
+                }
+            } else {
+                $flat[] = $row;
+            }
+        }
+
+        DB::transaction(function () use ($flat, $mode, &$counts) {
             if ($mode === 'full') {
                 $counts['deleted'] = InclusiveBranding::where('supplier_id', $this->supplier->id)->delete();
+            } else {
+                // Changes: replace everything for each product mentioned.
+                $codes = array_values(array_unique(array_filter(array_map(fn ($r) => F::string($r, 'simpleCode', 'productCode', 'itemCode'), $flat))));
+                foreach (array_chunk($codes, 500) as $chunk) {
+                    $counts['deleted'] += InclusiveBranding::where('supplier_id', $this->supplier->id)->whereIn('product_code', $chunk)->delete();
+                }
             }
 
-            foreach ($rows as $row) {
-                $productCode = F::string($row, 'simpleCode', 'productCode', 'itemCode', 'code');
-                if (! $productCode) {
+            $now = now();
+            $insert = [];
+            foreach ($flat as $r) {
+                $productCode = F::string($r, 'simpleCode', 'productCode', 'itemCode');
+                if (! $productCode || F::int($r, 'actionType') === self::ACTION_REMOVED) {
                     continue;
                 }
+                $positions = array_values(array_filter(array_map('trim', preg_split('/[\^,]/', (string) F::string($r, 'brandingPositions', 'positions')))));
 
-                // Rows may carry a nested list of specials per product, or be one special each.
-                $specials = F::pick($row, 'inclusiveBrandings', 'brandings', 'options', 'data');
-                $specials = is_array($specials) && array_is_list($specials) ? $specials : [$row];
-
-                if ($mode === 'changes') {
-                    $counts['deleted'] += InclusiveBranding::where('supplier_id', $this->supplier->id)
-                        ->where('product_code', $productCode)->delete();
-                    if (F::int($row, 'actionType') === self::ACTION_REMOVED) {
-                        continue;
-                    }
+                $insert[] = [
+                    'supplier_id' => $this->supplier->id,
+                    'external_id' => F::string($r, 'inclusiveBrandingId', 'id'),
+                    'product_code' => $productCode,
+                    'colour_code' => F::string($r, 'colour', 'colourCode', 'codeColour'),
+                    'position_code' => F::string($r, 'positionCode', 'brandingPositionCode'),
+                    'positions' => $positions ? json_encode($positions) : null,
+                    'branding_code' => F::string($r, 'brandingCode'),
+                    'replacement_code' => F::string($r, 'brandingReplacementCode', 'replacementCode', 'replacementBrandingCode'),
+                    'number_of_colours' => F::int($r, 'numberOfColours'),
+                    'min_quantity' => max(1, F::int($r, 'minQuantity') ?? 1),
+                    'valid_from' => ($v = F::string($r, 'validFrom')) ? \Illuminate\Support\Carbon::parse($v) : null,
+                    'valid_to' => ($v = F::string($r, 'validTo')) ? \Illuminate\Support\Carbon::parse($v)->min('2099-12-31') : null,
+                    'description' => F::string($r, 'inclusiveBrandingName', 'description', 'name'),
+                    'raw' => null, // the structured columns hold everything needed; keeps the table small
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($insert) >= 500) {
+                    InclusiveBranding::insert($insert);
+                    $counts['created'] += count($insert);
+                    $insert = [];
                 }
-
-                foreach ($specials as $special) {
-                    InclusiveBranding::create([
-                        'supplier_id' => $this->supplier->id,
-                        'product_code' => $productCode,
-                        'position_code' => F::string($special, 'positionCode', 'position', 'brandingPositionCode'),
-                        'branding_code' => F::string($special, 'brandingCode', 'inclusiveBrandingCode', 'code'),
-                        'replacement_code' => F::string($special, 'replacementCode', 'replacementBrandingCode', 'replaceWith'),
-                        'description' => F::string($special, 'description', 'name', 'brandingName', 'title'),
-                        'raw' => $special,
-                    ]);
-                    $counts['created']++;
-                }
+            }
+            if ($insert) {
+                InclusiveBranding::insert($insert);
+                $counts['created'] += count($insert);
             }
         });
 
