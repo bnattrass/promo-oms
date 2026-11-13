@@ -115,15 +115,24 @@ class EditQuote extends EditRecord
                         $this->refreshTotals();
                         Notification::make()->success()->title('Quote re-priced')->send();
                     }),
+                Action::make('markSent')->label('Mark sent (sent outside the system)')->icon(Heroicon::OutlinedPaperAirplane)
+                    ->visible(fn () => $this->record->status === QuoteStatus::Draft)
+                    ->action(function () {
+                        $this->record->update([
+                            'sent_at' => $this->record->sent_at ?? now(),
+                            'next_follow_up_at' => now()->addWeekdays($this->record->company->quote_follow_up_days ?: 3),
+                        ]);
+                        $this->setStatus(QuoteStatus::Sent);
+                    }),
                 Action::make('accepted')->label('Mark accepted')->icon(Heroicon::OutlinedCheckCircle)
-                    ->visible(fn () => $this->record->status === QuoteStatus::Sent)
+                    ->visible(fn () => in_array($this->record->status, [QuoteStatus::Draft, QuoteStatus::Sent], true))
                     ->action(fn () => $this->setStatus(QuoteStatus::Accepted)),
                 Action::make('declined')->label('Mark declined')->color('danger')
                     ->visible(fn () => in_array($this->record->status, [QuoteStatus::Draft, QuoteStatus::Sent], true))
                     ->requiresConfirmation()
                     ->action(fn () => $this->setStatus(QuoteStatus::Declined)),
                 Action::make('reopen')->label('Reopen as draft')
-                    ->visible(fn () => in_array($this->record->status, [QuoteStatus::Declined, QuoteStatus::Expired], true))
+                    ->visible(fn () => in_array($this->record->status, [QuoteStatus::Sent, QuoteStatus::Accepted, QuoteStatus::Declined, QuoteStatus::Expired], true))
                     ->action(fn () => $this->setStatus(QuoteStatus::Draft)),
                 DeleteAction::make(),
             ]),
