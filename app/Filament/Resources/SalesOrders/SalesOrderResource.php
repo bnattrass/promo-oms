@@ -13,11 +13,13 @@ use App\Filament\RelationManagers\AttachmentsRelationManager;
 use App\Filament\Support\Money;
 use App\Models\Contact;
 use App\Models\SalesOrder;
+use App\Support\Access;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -69,6 +71,12 @@ class SalesOrderResource extends Resource
     {
         return $schema->columns(3)->components([
             Section::make('Order')->columnSpan(2)->columns(2)->schema([
+                TextInput::make('number')->label('Order number')->placeholder('Automatic')->maxLength(30)
+                    ->visible(fn (): bool => Access::isAdmin())
+                    ->required(fn (string $operation): bool => $operation === 'edit')
+                    ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('company_id', Filament::getTenant()?->id))
+                    ->helperText('Leave blank for the next number. Change it to match your old system.')
+                    ->columnSpanFull(),
                 Select::make('customer_id')->relationship('customer', 'name')->disabled()->dehydrated(false),
                 Select::make('contact_id')->label('Contact person')
                     ->options(fn (Get $get) => $get('customer_id') ? Contact::where('customer_id', $get('customer_id'))->orderByDesc('is_primary')->orderBy('name')->get()->mapWithKeys(fn (Contact $c) => [$c->id => $c->label()]) : [])

@@ -39,6 +39,12 @@ class EditCompanyProfile extends EditTenantProfile
                 TextInput::make('quote_prefix')->required()->maxLength(10),
                 TextInput::make('sales_order_prefix')->required()->maxLength(10),
                 TextInput::make('purchase_order_prefix')->required()->maxLength(10),
+                TextInput::make('quote_next_number')->label('Next quote number')->integer()->minValue(1)
+                    ->helperText('To carry on from your old system. Leave blank to just continue.'),
+                TextInput::make('sales_order_next_number')->label('Next sales order number')->integer()->minValue(1),
+                TextInput::make('purchase_order_next_number')->label('Next PO number')->integer()->minValue(1),
+                TextInput::make('document_number_digits')->label('Digits in numbers')->integer()->minValue(1)->maxValue(10)->default(5)
+                    ->helperText('5 gives QT00042, 4 gives QT0042'),
                 TextInput::make('default_gp_percent')->label('Default GP %')->numeric()->suffix('%')->required(),
                 TextInput::make('vat_percent')->label('VAT %')->numeric()->suffix('%')->required(),
                 Grid::make(2)->schema([

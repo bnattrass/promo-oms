@@ -13,6 +13,7 @@ use App\Filament\Support\Money;
 use App\Models\Contact;
 use App\Models\Customer;
 use App\Models\Quote;
+use App\Support\Access;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
@@ -55,6 +56,12 @@ class QuoteResource extends Resource
     {
         return $schema->columns(3)->components([
             Section::make('Quote')->columnSpan(2)->columns(2)->schema([
+                TextInput::make('number')->label('Quote number')->placeholder('Automatic')->maxLength(30)
+                    ->visible(fn (): bool => Access::isAdmin())
+                    ->required(fn (string $operation): bool => $operation === 'edit')
+                    ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('company_id', Filament::getTenant()?->id))
+                    ->helperText('Leave blank for the next number. Change it to match your old system.')
+                    ->columnSpanFull(),
                 Select::make('customer_id')->label('Customer')
                     ->relationship('customer', 'name', modifyQueryUsing: fn ($query) => $query->where('company_id', Filament::getTenant()?->id))
                     ->searchable()->preload()->required()->live()
