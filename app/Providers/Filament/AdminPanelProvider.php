@@ -17,6 +17,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -38,6 +39,8 @@ class AdminPanelProvider extends PanelProvider
             ->brandName(config('app.name'))
             ->colors(['primary' => Color::Indigo])
             ->maxContentWidth(Width::Full)
+            // Small layout tweaks: list-page tabs aligned left instead of centred.
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): string => '<style>.fi-sc-tabs > .fi-tabs:not(.fi-contained){margin-inline-start:0;margin-inline-end:auto}</style>')
             ->tenant(Company::class, slugAttribute: 'slug')
             ->tenantProfile(EditCompanyProfile::class)
             ->navigationGroups(['Sales', 'Purchasing', 'Catalogue', 'Settings'])

@@ -9,6 +9,7 @@ use App\Filament\Resources\Quotes\Pages\EditQuote;
 use App\Filament\Resources\Quotes\Pages\ListQuotes;
 use App\Filament\Resources\Quotes\RelationManagers\LinesRelationManager;
 use App\Filament\RelationManagers\AttachmentsRelationManager;
+use App\Filament\Support\Money;
 use App\Models\Contact;
 use App\Models\Customer;
 use App\Models\Quote;
@@ -130,19 +131,21 @@ class QuoteResource extends Resource
             ->defaultSort('id', 'desc')
             ->modifyQueryUsing(fn ($query) => $query->with('customer', 'salesRep'))
             ->columns([
-                TextColumn::make('number')->searchable()->sortable()->weight('bold'),
-                TextColumn::make('customer.name')->searchable()->sortable()->wrap(),
-                TextColumn::make('reference')->searchable()->limit(30)->toggleable(),
-                TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
+                TextColumn::make('number')->label('Quote')->searchable()->sortable()->weight('bold'),
+                TextColumn::make('customer.name')->label('Customer')->searchable()->sortable()->wrap()
+                    ->description(fn (Quote $record) => $record->reference ? str($record->reference)->limit(40) : null),
                 TextColumn::make('status')->badge(),
-                TextColumn::make('quote_date')->date('j M Y')->sortable(),
-                TextColumn::make('subtotal')->label('Sell (ex VAT)')->money('ZAR')->sortable(),
-                TextColumn::make('cost_total')->label('Cost')->money('ZAR')->sortable()->toggleable(),
-                TextColumn::make('gp_amount')->label('GP')->money('ZAR')->sortable()
-                    ->color(fn ($state, Quote $record) => $record->gp_percent < 20 ? 'danger' : ($record->gp_percent < 30 ? 'warning' : 'success')),
-                TextColumn::make('gp_percent')->label('GP %')->suffix('%')->sortable(),
-                TextColumn::make('total')->label('Total (incl VAT)')->money('ZAR')->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('quote_date')->label('Date')->date('j M')->sortable(),
+                TextColumn::make('subtotal')->label('Sell ex VAT')->formatStateUsing(Money::formatter())->alignEnd()->sortable(),
+                TextColumn::make('gp_amount')->label('GP')->formatStateUsing(Money::formatter())->alignEnd()->sortable()
+                    ->description(fn (Quote $record) => number_format((float) $record->gp_percent, 1).'%')
+                    ->color(fn (Quote $record) => $record->gp_percent < 20 ? 'danger' : ($record->gp_percent < 30 ? 'warning' : 'success')),
+                TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
                 TextColumn::make('next_follow_up_at')->label('Follow up')->since()->placeholder('-')->toggleable(),
+                // Off by default - switch on with the columns icon
+                TextColumn::make('reference')->searchable()->limit(30)->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('cost_total')->label('Cost')->formatStateUsing(Money::formatter())->alignEnd()->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('total')->label('Total incl VAT')->formatStateUsing(Money::formatter())->alignEnd()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('status')->options(QuoteStatus::class)->multiple(),

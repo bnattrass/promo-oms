@@ -10,6 +10,7 @@ use App\Filament\Resources\SalesOrders\Pages\ListSalesOrders;
 use App\Filament\Resources\SalesOrders\RelationManagers\LinesRelationManager;
 use App\Filament\Resources\SalesOrders\RelationManagers\PurchaseOrdersRelationManager;
 use App\Filament\RelationManagers\AttachmentsRelationManager;
+use App\Filament\Support\Money;
 use App\Models\Contact;
 use App\Models\SalesOrder;
 use BackedEnum;
@@ -118,25 +119,28 @@ class SalesOrderResource extends Resource
             ->defaultSort('id', 'desc')
             ->modifyQueryUsing(fn ($query) => $query->with('customer', 'salesRep'))
             ->columns([
-                TextColumn::make('number')->searchable()->sortable()->weight('bold'),
-                TextColumn::make('customer.name')->searchable()->sortable()->wrap(),
-                TextColumn::make('customer_po_number')->label('Cust. PO')->searchable()->toggleable(),
-                TextColumn::make('reference')->limit(30)->toggleable(),
+                TextColumn::make('number')->label('Order')->searchable()->sortable()->weight('bold'),
+                TextColumn::make('customer.name')->label('Customer')->searchable()->sortable()->wrap()
+                    ->description(fn (SalesOrder $record) => $record->reference ? str($record->reference)->limit(40) : null),
                 TextColumn::make('status')->badge(),
-                TextColumn::make('order_date')->date('j M Y')->sortable(),
-                TextColumn::make('required_by')->date('j M Y')->sortable()
+                TextColumn::make('order_date')->label('Ordered')->date('j M')->sortable(),
+                TextColumn::make('required_by')->label('Needed by')->date('j M')->sortable()->placeholder('-')
                     ->color(fn ($state, SalesOrder $record) => $state && $state->isPast() && $record->status->isOpen() ? 'danger' : null),
-                TextColumn::make('subtotal')->label('Sell (ex VAT)')->money('ZAR')->sortable(),
-                TextColumn::make('gp_amount')->label('GP')->money('ZAR')->sortable(),
-                TextColumn::make('total')->label('Total (incl VAT)')->money('ZAR')->sortable()->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('invoice_number')->label('Invoice')->searchable()->placeholder('-')->toggleable(),
+                TextColumn::make('subtotal')->label('Sell ex VAT')->formatStateUsing(Money::formatter())->alignEnd()->sortable(),
+                TextColumn::make('gp_amount')->label('GP')->formatStateUsing(Money::formatter())->alignEnd()->sortable()
+                    ->description(fn (SalesOrder $record) => number_format((float) $record->gp_percent, 1).'%')
+                    ->color(fn (SalesOrder $record) => $record->gp_percent < 20 ? 'danger' : ($record->gp_percent < 30 ? 'warning' : 'success')),
+                TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
+                // Off by default - switch on with the columns icon
+                TextColumn::make('reference')->limit(30)->searchable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('customer_po_number')->label('Cust. PO')->searchable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('invoice_number')->label('Invoice')->searchable()->placeholder('-')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('total')->label('Total incl VAT')->formatStateUsing(Money::formatter())->alignEnd()->sortable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('commission_state')->label('Commission')->badge()
                     ->getStateUsing(fn (SalesOrder $record) => (float) $record->commission_total > 0 ? $record->commissionStatus() : null)
                     ->placeholder('-')
                     ->visible(fn () => auth()->user()?->isAdminOf(\Filament\Facades\Filament::getTenant()))
-                    ->toggleable(),
-                TextColumn::make('gp_percent')->label('GP %')->suffix('%')->toggleable(),
-                TextColumn::make('salesRep.name')->label('Rep')->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('status')->options(SalesOrderStatus::class)->multiple(),
