@@ -33,6 +33,7 @@ class PricedLinesTable
             $rm->dispatch('document-totals-updated');
         };
         $nextSort = fn () => ($owner->lines()->max('sort') ?? 0) + 1;
+        $rand = fn ($state) => 'R '.number_format((float) $state, 2, '.', ' ');
 
         return $table
             ->reorderable($editable ? 'sort' : null)
@@ -44,39 +45,42 @@ class PricedLinesTable
                 TextColumn::make('description')->label('Item')->wrap()
                     ->formatStateUsing(fn ($state, Model $record) => trim(($record->item_code ? $record->item_code.' · ' : '').$state))
                     ->description(fn (Model $record) => static::lineSummary($record))
-                    ->extraAttributes(['style' => 'min-width:16rem; max-width:28rem']),
-                TextInputColumn::make('quantity')->label('Qty')->type('number')->rules(['required', 'integer', 'min:1'])
-                    ->disabled(! $editable)->extraInputAttributes(['style' => 'width:4.5rem'])
+                    ->extraAttributes(['style' => 'min-width:14rem; max-width:22rem']),
+                TextInputColumn::make('quantity')->label('Qty')->rules(['required', 'integer', 'min:1'])
+                    ->inputMode('numeric')->width('6rem')
+                    ->disabled(! $editable)->extraInputAttributes(['style' => 'text-align:right'])
                     ->updateStateUsing(function ($state, Model $record) use ($owner, $after) {
                         PricedLineForm::repriceRecord($record, ['quantity' => (int) $state], $owner);
                         $after();
                     }),
-                TextColumn::make('total_cost')->label('Cost')->money('ZAR'),
-                TextInputColumn::make('gp_percent')->label('GP %')->type('number')->rules(['required', 'numeric', 'min:0', 'max:95'])
-                    ->disabled(! $editable)->extraInputAttributes(['style' => 'width:4.5rem'])
+                TextColumn::make('total_cost')->label('Cost')->formatStateUsing($rand)->alignEnd(),
+                TextInputColumn::make('gp_percent')->label('GP %')->rules(['required', 'numeric', 'min:0', 'max:95'])
+                    ->inputMode('decimal')->width('5rem')
+                    ->disabled(! $editable)->extraInputAttributes(['style' => 'text-align:right'])
                     ->tooltip('Type a new GP % and press Enter. Clears any fixed sell price on the line.')
                     ->updateStateUsing(function ($state, Model $record) use ($owner, $after) {
                         PricedLineForm::repriceRecord($record, ['gp_percent' => (float) $state, 'unit_price_override' => null], $owner);
                         $after();
                     }),
-                TextInputColumn::make('unit_price')->label('Unit sell')->type('number')->rules(['required', 'numeric', 'min:0'])
-                    ->disabled(! $editable)->extraInputAttributes(['style' => 'width:6.5rem'])
+                TextInputColumn::make('unit_price')->label('Unit sell')->rules(['required', 'numeric', 'min:0'])
+                    ->inputMode('decimal')->width('6.5rem')
+                    ->disabled(! $editable)->extraInputAttributes(['style' => 'text-align:right'])
                     ->tooltip('Type a sell price to fix it; GP % is recalculated.')
                     ->updateStateUsing(function ($state, Model $record) use ($owner, $after) {
                         PricedLineForm::repriceRecord($record, ['unit_price_override' => (float) $state], $owner);
                         $after();
                     }),
-                TextColumn::make('setup_price')->label('Setup sell')->money('ZAR')->toggleable()
-                    ->placeholder('-')->formatStateUsing(fn ($state) => (float) $state > 0 ? 'R '.number_format((float) $state, 2) : '-'),
-                TextColumn::make('line_total')->label('Line total')->money('ZAR')->weight('bold'),
-                TextColumn::make('gp_amount')->label('GP')->money('ZAR')
+                TextColumn::make('setup_price')->label('Setup sell')->toggleable()->alignEnd()
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? $rand($state) : '-'),
+                TextColumn::make('line_total')->label('Line total')->formatStateUsing($rand)->alignEnd()->weight('bold'),
+                TextColumn::make('gp_amount')->label('GP')->formatStateUsing($rand)->alignEnd()
                     ->color(fn (Model $record) => $record->gp_percent < 20 ? 'danger' : ($record->gp_percent < 30 ? 'warning' : 'success')),
                 // Detail columns, off by default (switch on with the columns icon above the table)
                 TextColumn::make('item_code')->label('Code')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('unit_cost')->label('Item cost /u')->money('ZAR')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('branding_unit_cost')->label('Brand cost /u')->money('ZAR')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('setup_cost')->label('Setup cost')->money('ZAR')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('commission_amount')->label('Comm.')->money('ZAR')->toggleable(isToggledHiddenByDefault: true)
+                TextColumn::make('unit_cost')->label('Item cost /u')->formatStateUsing($rand)->alignEnd()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('branding_unit_cost')->label('Brand cost /u')->formatStateUsing($rand)->alignEnd()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('setup_cost')->label('Setup cost')->formatStateUsing($rand)->alignEnd()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('commission_amount')->label('Comm.')->formatStateUsing($rand)->alignEnd()->toggleable(isToggledHiddenByDefault: true)
                     ->visible(fn () => \App\Support\Access::canSeeCommission($owner)),
                 ...($owner instanceof SalesOrder ? [TextColumn::make('stage')->badge()] : []),
             ])
@@ -92,15 +96,15 @@ class PricedLinesTable
                     ->after($after),
             ] : [])
             ->recordActions($editable ? [
-                EditAction::make()->modalWidth(fn (Model $record) => $record->isCatalogue() ? '6xl' : '4xl')
+                EditAction::make()->iconButton()->tooltip('Edit line')->modalWidth(fn (Model $record) => $record->isCatalogue() ? '6xl' : '4xl')
                     ->schema(fn (Model $record) => $record->isCatalogue() ? PricedLineForm::components($owner) : PricedLineForm::customComponents($owner))
                     ->mutateDataUsing(fn (array $data, Model $record) => PricedLineForm::priceData($data + ['line_type' => $record->line_type], $owner))
                     ->after($after),
-                ReplicateAction::make()->label('Duplicate')->icon(Heroicon::OutlinedDocumentDuplicate)
+                ReplicateAction::make()->label('Duplicate')->icon(Heroicon::OutlinedDocumentDuplicate)->iconButton()->tooltip('Duplicate line')
                     ->excludeAttributes(['id'])
                     ->schema([])
                     ->after($after),
-                DeleteAction::make()->after($after),
+                DeleteAction::make()->iconButton()->tooltip('Delete line')->after($after),
             ] : [
                 Action::make('locked')->label('Locked')->disabled()->tooltip('Lines are locked once purchase orders exist'),
             ]);
